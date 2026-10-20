@@ -26,6 +26,9 @@ public:
     int selected();
     void select(int index);
 
+    // Replaces one mesh, keeping the rest of the scene. Used when an edited UV layout is applied.
+    bool replaceMesh(uint32_t index, const Mesh &mesh);
+
     // Calls fn(Scene&) with the document locked. Used by the renderer to copy geometry.
     template <typename Fn>
     void withScene(Fn fn) {

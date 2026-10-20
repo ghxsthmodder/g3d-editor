@@ -30,8 +30,11 @@ set(G3D_CORE_SOURCES
     core/primitives.cpp
     core/scene.cpp
     core/document.cpp
+    core/uv_islands.cpp
     importers/assimp_importer.cpp
     uv/uv_service.cpp
+    uv/uv_edit.cpp
+    uv/uv_editor.cpp
     ${G3D_XATLAS}
 )
 
@@ -77,6 +80,18 @@ else()
     target_compile_definitions(host_import_test
         PRIVATE G3D_TEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/models")
     add_test(NAME import_test COMMAND host_import_test)
+
+    add_executable(host_uv_test tests/host_uv_test.cpp)
+    target_link_libraries(host_uv_test PRIVATE g3dcore)
+    target_compile_definitions(host_uv_test
+        PRIVATE G3D_TEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/models")
+    add_test(NAME uv_islands_test COMMAND host_uv_test)
+
+    add_executable(host_uv_edit_test tests/host_uv_edit_test.cpp)
+    target_link_libraries(host_uv_edit_test PRIVATE g3dcore)
+    target_compile_definitions(host_uv_edit_test
+        PRIVATE G3D_TEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/models")
+    add_test(NAME uv_edit_test COMMAND host_uv_edit_test)
 
     # Headless GL test of the renderer. Only built when the host has EGL and OpenGL ES 3.
     find_library(G3D_EGL_LIBRARY EGL)

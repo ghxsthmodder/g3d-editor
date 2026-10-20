@@ -70,6 +70,16 @@ void Document::select(int index) {
     scene_.select(index);
 }
 
+bool Document::replaceMesh(uint32_t index, const Mesh &mesh) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    Mesh *target = scene_.meshAt(index);
+    if (target == nullptr) {
+        return false;
+    }
+    *target = mesh;
+    return true;
+}
+
 std::string Document::lastImportReport() {
     std::lock_guard<std::mutex> guard(mutex_);
     return lastReport_;

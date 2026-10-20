@@ -1,45 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">G3D Editor</string>
-    <string name="phase_3_subtitle">Fase 3: geração e edição de UVs</string>
+    <string name="phase_3_status">fase 3: geração e edição de UVs</string>
 
-    <string name="import_model">Importar modelo</string>
+    <string name="import_model">Importar</string>
     <string name="frame_scene">Reenquadrar</string>
+    <string name="label_shading">Sombra:</string>
+    <string name="label_view">Vista:</string>
     <string name="shading_solid">Sólido</string>
     <string name="shading_normals">Normais</string>
-    <string name="view_split">3D + UV</string>
-    <string name="view_three_d">Somente 3D</string>
-    <string name="view_atlas">Somente UV</string>
+    <string name="view_split">3D+UV</string>
+    <string name="view_three_d">3D</string>
+    <string name="view_atlas">UV</string>
     <string name="open_uv_editor">Editor UV</string>
     <string name="toggle_panel">Painel</string>
+    <string name="toggle_log">Log ▾</string>
+    <string name="toggle_log_hidden">Log ▸</string>
     <string name="hierarchy_title">Hierarquia</string>
-    <string name="viewport_hint">3D: 1 dedo orbita, 2 dedos movem, pinça aproxima, toque seleciona · atlas: arrasta, pinça, toque escolhe a ilha</string>
+    <string name="viewport_hint">toque seleciona · arrasta orbita · 2 dedos movem · pinça aproxima</string>
     <string name="menu_native_diagnostic">Diagnóstico de UV (fase 1)</string>
 
     <string name="uv_title">Editor UV</string>
     <string name="uv_generate_title">Geração</string>
-    <string name="uv_generate_fields">margem em texels · resolução do atlas</string>
     <string name="uv_padding_hint">margem</string>
     <string name="uv_padding_default">2</string>
     <string name="uv_resolution_hint">resolução</string>
     <string name="uv_resolution_default">1024</string>
-    <string name="uv_generate">Gerar e pré-visualizar</string>
-    <string name="uv_selection_title">Seleção</string>
+    <string name="uv_generate">Gerar UV</string>
     <string name="uv_select_all">Tudo</string>
     <string name="uv_select_none">Nada</string>
     <string name="uv_additive">Somar ao tocar</string>
     <string name="uv_translate_title">Mover ilhas</string>
-    <string name="uv_move_step">cada toque desloca 5 % do atlas</string>
     <string name="uv_move_left">←</string>
     <string name="uv_move_right">→</string>
     <string name="uv_move_down">↓</string>
     <string name="uv_move_up">↑</string>
-    <string name="uv_rotate_title">Girar</string>
     <string name="uv_rotate_minus_90">-90°</string>
     <string name="uv_rotate_minus_15">-15°</string>
     <string name="uv_rotate_plus_15">+15°</string>
     <string name="uv_rotate_plus_90">+90°</string>
-    <string name="uv_transform_title">Escala e arranjo</string>
     <string name="uv_scale_down">0,8×</string>
     <string name="uv_scale_up">1,25×</string>
     <string name="uv_fit">Ajustar</string>

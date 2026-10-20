@@ -7,18 +7,22 @@
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:background="@color/editor_panel">
 
+        <!-- No subtitle: the phase line duplicated what the log already said, for a whole strip of
+             height the model could have used. -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:menu="@menu/main_menu"
-            app:subtitle="@string/phase_3_subtitle"
-            app:subtitleTextAppearance="@style/TextAppearance.Material3.BodySmall"
-            app:title="@string/app_name" />
+            app:title="@string/app_name"
+            app:titleTextColor="@color/editor_text" />
     </com.google.android.material.appbar.AppBarLayout>
 
+    <!-- The viewport keeps whatever the panels and the two strips do not need: the model and its
+         atlas are the point of the screen, so the chrome is fixed in height instead of weighted. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -37,24 +41,24 @@
 
             <TextView
                 android:id="@+id/viewportHint"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="bottom|start"
-                android:layout_margin="8dp"
+                android:layout_gravity="bottom"
+                android:layout_margin="6dp"
                 android:background="@color/overlay_background"
-                android:padding="6dp"
+                android:padding="3dp"
                 android:text="@string/viewport_hint"
                 android:textColor="@color/editor_text_dim"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
         </FrameLayout>
 
         <LinearLayout
             android:id="@+id/hierarchyPanel"
-            android:layout_width="250dp"
+            android:layout_width="200dp"
             android:layout_height="match_parent"
             android:background="@color/editor_panel"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="6dp">
 
             <TextView
                 android:layout_width="match_parent"
@@ -62,37 +66,33 @@
                 android:text="@string/hierarchy_title"
                 android:textAllCaps="true"
                 android:textColor="@color/editor_text_dim"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
-
-            <ScrollView
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1">
-
-                <LinearLayout
-                    android:id="@+id/hierarchyList"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-            </ScrollView>
 
             <TextView
                 android:id="@+id/sceneSummary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:paddingTop="2dp"
+                android:paddingBottom="4dp"
                 android:textColor="@color/editor_text_dim"
-                android:textIsSelectable="true"
                 android:textSize="11sp" />
+
+            <LinearLayout
+                android:id="@+id/hierarchyList"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/uvPanel"
-            android:layout_width="280dp"
+            android:layout_width="232dp"
             android:layout_height="match_parent"
             android:background="@color/editor_panel"
             android:orientation="vertical"
-            android:padding="8dp"
+            android:padding="6dp"
             android:visibility="gone">
 
             <TextView
@@ -101,474 +101,408 @@
                 android:text="@string/uv_title"
                 android:textAllCaps="true"
                 android:textColor="@color/editor_text_dim"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/uvStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:paddingTop="2dp"
+                android:paddingBottom="4dp"
                 android:textColor="@color/editor_text_dim"
-                android:textIsSelectable="true"
                 android:textSize="11sp" />
 
-            <ScrollView
+            <TextView
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1">
+                android:layout_height="wrap_content"
+                android:text="@string/uv_generate_title"
+                android:textAllCaps="true"
+                android:textColor="@color/editor_text_dim"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/uvPadding"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:autofillHints="none"
+                    android:hint="@string/uv_padding_hint"
+                    android:inputType="number"
+                    android:maxLength="4"
+                    android:text="@string/uv_padding_default"
+                    android:textSize="12sp" />
+
+                <EditText
+                    android:id="@+id/uvResolution"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:autofillHints="none"
+                    android:hint="@string/uv_resolution_hint"
+                    android:inputType="number"
+                    android:maxLength="5"
+                    android:text="@string/uv_resolution_default"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvGenerate"
+                    style="@style/ToolButton.Tonal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="@string/uv_generate" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvSelectAll"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/uv_select_all" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvSelectNone"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/uv_select_none" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/uvAdditive"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/uv_additive"
+                android:textColor="@color/editor_text"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/uv_translate_title"
+                android:textAllCaps="true"
+                android:textColor="@color/editor_text_dim"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <!-- A cross of four buttons is shorter than a row of four arrows with labels. -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvMoveUp"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="64dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/uv_move_up" />
 
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingTop="8dp"
-                        android:text="@string/uv_generate_title"
-                        android:textAllCaps="true"
-                        android:textColor="@color/editor_text_dim"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <EditText
-                            android:id="@+id/uvPadding"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:autofillHints="none"
-                            android:hint="@string/uv_padding_hint"
-                            android:inputType="number"
-                            android:maxLength="4"
-                            android:text="@string/uv_padding_default"
-                            android:textSize="13sp" />
-
-                        <EditText
-                            android:id="@+id/uvResolution"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:layout_weight="1"
-                            android:autofillHints="none"
-                            android:hint="@string/uv_resolution_hint"
-                            android:inputType="number"
-                            android:maxLength="5"
-                            android:text="@string/uv_resolution_default"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/uv_generate_fields"
-                        android:textColor="@color/editor_text_dim"
-                        android:textSize="10sp" />
+                    android:orientation="horizontal">
 
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/uvGenerate"
-                        style="@style/Widget.Material3.Button.TonalButton"
-                        android:layout_width="match_parent"
+                        android:id="@+id/uvMoveLeft"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="64dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/uv_generate" />
+                        android:text="@string/uv_move_left" />
 
-                    <TextView
-                        android:layout_width="match_parent"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/uvMoveDown"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="64dp"
                         android:layout_height="wrap_content"
-                        android:paddingTop="10dp"
-                        android:text="@string/uv_selection_title"
-                        android:textAllCaps="true"
-                        android:textColor="@color/editor_text_dim"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
+                        android:text="@string/uv_move_down" />
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/uvMoveRight"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="64dp"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvSelectAll"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_select_all"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvSelectNone"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_select_none"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <CheckBox
-                        android:id="@+id/uvAdditive"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/uv_additive"
-                        android:textColor="@color/editor_text"
-                        android:textSize="12sp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingTop="10dp"
-                        android:text="@string/uv_translate_title"
-                        android:textAllCaps="true"
-                        android:textColor="@color/editor_text_dim"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/uv_move_step"
-                        android:textColor="@color/editor_text_dim"
-                        android:textSize="10sp" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvMoveLeft"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_move_left"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvMoveRight"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_move_right"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvMoveDown"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_move_down"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvMoveUp"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_move_up"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingTop="10dp"
-                        android:text="@string/uv_rotate_title"
-                        android:textAllCaps="true"
-                        android:textColor="@color/editor_text_dim"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvRotateMinus90"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_rotate_minus_90"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvRotateMinus15"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_rotate_minus_15"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvRotatePlus15"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_rotate_plus_15"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvRotatePlus90"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_rotate_plus_90"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingTop="10dp"
-                        android:text="@string/uv_transform_title"
-                        android:textAllCaps="true"
-                        android:textColor="@color/editor_text_dim"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvScaleDown"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_scale_down"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvScaleUp"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_scale_up"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvFit"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_fit"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvRepack"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_repack"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvFrameAtlas"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_frame_atlas"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvApply"
-                            style="@style/Widget.Material3.Button"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_apply"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/uvCancel"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:minWidth="0dp"
-                            android:text="@string/uv_cancel"
-                            android:textSize="12sp" />
-                    </LinearLayout>
+                        android:text="@string/uv_move_right" />
                 </LinearLayout>
-            </ScrollView>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvRotateMinus90"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/uv_rotate_minus_90" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvRotateMinus15"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/uv_rotate_minus_15" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvRotatePlus15"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/uv_rotate_plus_15" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvRotatePlus90"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/uv_rotate_plus_90" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvScaleDown"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/uv_scale_down" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvScaleUp"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/uv_scale_up" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvFit"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/uv_fit" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvRepack"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/uv_repack" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvFrameAtlas"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/uv_frame_atlas" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:gravity="bottom"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvCancel"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/uv_cancel" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvApply"
+                    style="@style/ToolButton.Tonal"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/uv_apply" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
+    <!-- One row of small controls replaces the two full-height bars the editor had, so the model
+         loses one strip of pixels instead of two. -->
     <HorizontalScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="34dp"
         android:background="@color/editor_panel"
         android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="6dp">
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/importModel"
-                style="@style/Widget.Material3.Button.TonalButton"
+                style="@style/ToolButton.Tonal"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
+                android:layout_height="match_parent"
                 android:text="@string/import_model" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/frameScene"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/ToolButton.Outlined"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:text="@string/frame_scene" />
+
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
-                android:text="@string/frame_scene" />
+                android:layout_marginStart="8dp"
+                android:text="@string/label_shading"
+                android:textColor="@color/editor_text_dim"
+                android:textSize="11sp" />
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/shadingGroup"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="4dp"
                 app:selectionRequired="true"
                 app:singleSelection="true">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/shadingSolid"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    style="@style/ToolButton.Outlined"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:text="@string/shading_solid" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/shadingNormals"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    style="@style/ToolButton.Outlined"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:text="@string/shading_normals" />
             </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/label_view"
+                android:textColor="@color/editor_text_dim"
+                android:textSize="11sp" />
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/viewGroup"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="4dp"
                 app:selectionRequired="true"
                 app:singleSelection="true">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/viewSplit"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/view_split" />
-
-                <com.google.android.material.button.MaterialButton
                     android:id="@+id/viewThreeD"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    style="@style/ToolButton.Outlined"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:text="@string/view_three_d" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/viewAtlas"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:id="@+id/viewSplit"
+                    style="@style/ToolButton.Outlined"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
+                    android:text="@string/view_split" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/viewAtlas"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
                     android:text="@string/view_atlas" />
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/openUvEditor"
-                style="@style/Widget.Material3.Button.TonalButton"
+                style="@style/ToolButton.Outlined"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
                 android:text="@string/open_uv_editor" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/togglePanel"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/ToolButton.Outlined"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:text="@string/toggle_panel" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/toggleLog"
+                style="@style/ToolButton.Outlined"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:text="@string/toggle_log" />
         </LinearLayout>
     </HorizontalScrollView>
 
     <ScrollView
         android:id="@+id/outputScroll"
         android:layout_width="match_parent"
-        android:layout_height="72dp"
-        android:background="@color/editor_background"
-        android:padding="6dp">
+        android:layout_height="44dp"
+        android:background="@color/editor_background">
 
         <TextView
             android:id="@+id/output"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
+            android:padding="4dp"
             android:textColor="@color/editor_text_dim"
             android:textIsSelectable="true"
-            android:textSize="12sp" />
+            android:textSize="11sp"
+            android:typeface="monospace" />
     </ScrollView>
 </LinearLayout>

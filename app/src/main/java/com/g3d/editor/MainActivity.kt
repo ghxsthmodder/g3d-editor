@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private var busy = false
     private var uvOpen = false
     private var uvMesh = -1
+    private var logVisible = true
 
     private lateinit var viewport: ModelView
     private lateinit var hierarchyPanel: View
@@ -49,6 +50,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var outputText: TextView
     private lateinit var importButton: MaterialButton
     private lateinit var frameButton: MaterialButton
+    private lateinit var logButton: MaterialButton
     private lateinit var shadingGroup: MaterialButtonToggleGroup
     private lateinit var viewGroup: MaterialButtonToggleGroup
     private lateinit var uvPanel: View
@@ -75,6 +77,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         outputText = findViewById(R.id.output)
         importButton = findViewById(R.id.importModel)
         frameButton = findViewById(R.id.frameScene)
+        logButton = findViewById(R.id.toggleLog)
         shadingGroup = findViewById(R.id.shadingGroup)
         viewGroup = findViewById(R.id.viewGroup)
         uvPanel = findViewById(R.id.uvPanel)
@@ -90,6 +93,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             report("câmera ajustada ao conteúdo")
         }
         findViewById<View>(R.id.togglePanel).setOnClickListener { toggleSidePanel() }
+        logButton.setOnClickListener { toggleLog() }
         findViewById<View>(R.id.openUvEditor).setOnClickListener { openUvEditor() }
         shadingGroup.check(R.id.shadingSolid)
         shadingGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -167,6 +171,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             return
         }
 
+        appendLine(getString(R.string.phase_3_status))
         appendLine("nativo: ${Native.nativeBuildInfo()}")
         renderLog()
         refreshHierarchy()
@@ -198,6 +203,13 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     }
 
     // --- side panels ---------------------------------------------------------------------
+
+    /** The log is the least important strip on the screen, so it can get out of the way. */
+    private fun toggleLog() {
+        logVisible = !logVisible
+        outputScroll.visibility = if (logVisible) View.VISIBLE else View.GONE
+        logButton.setText(if (logVisible) R.string.toggle_log else R.string.toggle_log_hidden)
+    }
 
     /** The right column shows the hierarchy or the UV tools, never both: neither fits twice. */
     private fun toggleSidePanel() {
@@ -258,9 +270,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                         mesh
                     )
                 )
-                appendLine(reply.lineSequence().drop(1).filter { it.isNotBlank() }
-                    .joinToString("\n") { "  $it" })
-                renderLog()
+                // The state and the validation report belong to the panel; the log keeps the event.
                 refreshUvStatus()
             }
         }.start()
@@ -290,9 +300,6 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     return@runOnUiThread
                 }
                 finishWork(getString(R.string.status_uv_generated, elapsed))
-                appendLine(reply.lineSequence().filter { it.isNotBlank() }
-                    .joinToString("\n") { "  $it" })
-                renderLog()
                 viewport.frameAtlas()
                 refreshUvStatus()
             }

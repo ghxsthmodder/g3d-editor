@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <numeric>
 #include <unordered_set>
@@ -33,25 +34,41 @@ void mergeBounds(const float min[2], const float max[2], float outMin[2], float 
     }
 }
 
+// A model can flag hundreds of islands, and no panel shows a list that long. The count is what the
+// user acts on, so only the first ids are named and the rest is added up.
+std::string islandIds(const std::vector<uint32_t> &ids) {
+    constexpr size_t kShown = 6;
+    std::string text;
+    for (size_t i = 0; i < ids.size() && i < kShown; ++i) {
+        text += (i ? "," : "") + std::to_string(ids[i]);
+    }
+    if (ids.size() > kShown) {
+        text += " +" + std::to_string(ids.size() - kShown);
+    }
+    return text;
+}
+
+std::string percent(float fraction) {
+    char buffer[24];
+    std::snprintf(buffer, sizeof(buffer), "%.1f", fraction * 100.0f);
+    return buffer;
+}
+
 }  // namespace
 
 std::string UvEditReport::describe() const {
     std::string text = "selecionadas=" + std::to_string(selectionCount) +
-                       " area_atlas=" + std::to_string(coveredArea * 100.0f) + "%";
+                       " area_atlas=" + percent(coveredArea) + "%";
     if (clean()) {
         return text + " sem problemas";
     }
     if (!outsideAtlas.empty()) {
-        text += " fora_do_atlas=";
-        for (size_t i = 0; i < outsideAtlas.size(); ++i) {
-            text += (i ? "," : "") + std::to_string(outsideAtlas[i]);
-        }
+        text += " fora_do_atlas=" + std::to_string(outsideAtlas.size()) + " (" +
+                islandIds(outsideAtlas) + ")";
     }
     if (!overlapping.empty()) {
-        text += " sobrepostas=";
-        for (size_t i = 0; i < overlapping.size(); ++i) {
-            text += (i ? "," : "") + std::to_string(overlapping[i]);
-        }
+        text += " sobrepostas=" + std::to_string(overlapping.size()) + " (" +
+                islandIds(overlapping) + ")";
     }
     return text;
 }

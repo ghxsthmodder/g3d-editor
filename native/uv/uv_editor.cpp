@@ -105,6 +105,11 @@ uint32_t UvEditor::meshIndex() {
     return meshIndex_;
 }
 
+uint64_t UvEditor::revision() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return revision_;
+}
+
 bool UvEditor::select(uint32_t island, bool additive) {
     return edit([island, additive](UvSession &session) {
         return session.selectIsland(island, additive);

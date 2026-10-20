@@ -1,6 +1,7 @@
 // Headless check of the renderer: builds an EGL context through Mesa, compiles the real shaders,
 // uploads an imported model, draws into a pbuffer and reads the pixels back. It also exercises tap
-// picking, which uses the same matrices as the device. Skipped (exit 0) when EGL is unavailable.
+// picking, the 2D atlas layer and its own pan/zoom, which use the same maths as on the device.
+// Skipped (exit 0) when EGL is unavailable.
 
 #include <cmath>
 #include <cstdio>
@@ -17,6 +18,7 @@
 #include "core/document.hpp"
 #include "importers/assimp_importer.hpp"
 #include "renderer/g3d_renderer.hpp"
+#include "uv/uv_editor.hpp"
 
 #ifndef G3D_TEST_MODEL_DIR
 #define G3D_TEST_MODEL_DIR "."
@@ -29,6 +31,13 @@ constexpr float kBackground[3] = {0.094f, 0.106f, 0.125f};
 
 int failures = 0;
 int checks = 0;
+
+// One tap mapped into atlas coordinates.
+struct AtlasSample {
+    bool hit;
+    float u;
+    float v;
+};
 
 void check(bool condition, const std::string &label) {
     ++checks;
@@ -73,6 +82,26 @@ int countClose(const std::vector<unsigned char> &pixels, float red, float green,
         }
     }
     return count;
+}
+
+// Counts pixels of one colour inside a column range, so the atlas can be inspected separately
+// from the 3D preview. Rows are read bottom-up, which does not matter for a full-height band.
+int countColorIn(const std::vector<unsigned char> &pixels, int fromX, int toX, float red,
+                 float green, float blue, float tolerance = 3.0f) {
+    int count = 0;
+    for (int y = 0; y < kSize; ++y) {
+        for (int x = fromX; x < toX; ++x) {
+            if (matches(pixels, static_cast<size_t>(y) * kSize + x, red, green, blue, tolerance)) {
+                ++count;
+            }
+        }
+    }
+    return count;
+}
+
+int countOtherThanIn(const std::vector<unsigned char> &pixels, int fromX, int toX, float red,
+                     float green, float blue) {
+    return (toX - fromX) * kSize - countColorIn(pixels, fromX, toX, red, green, blue);
 }
 
 std::vector<char> readAll(const std::string &path) {
@@ -232,6 +261,168 @@ int main() {
         }
     }
     check(moved > 100, "orbitar muda a imagem, canais=" + std::to_string(moved));
+
+    // --- the atlas layer -----------------------------------------------------------------
+    // The split puts 55% of the surface on the 3D preview, so the atlas owns columns 35..63.
+    constexpr int kAtlasLeft = static_cast<int>(static_cast<float>(kSize) * 0.55f);
+    constexpr float kGrid[3] = {0.239f, 0.263f, 0.310f};
+    constexpr float kBorder[3] = {0.478f, 0.518f, 0.584f};
+    constexpr float kOverlap[3] = {0.898f, 0.267f, 0.239f};
+
+    g3d::UvEditor &editor = g3d::UvEditor::instance();
+    std::string editError;
+    check(editor.begin(0, editError), "sessao de edicao UV abre a malha da cena: " + editError);
+    renderer.setViewMode(g3d::Renderer::kViewSplit);
+    renderer.draw();
+    check(glGetError() == GL_NO_ERROR, "nenhum erro de GL com o atlas visivel");
+    const std::vector<unsigned char> split = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "atlas", split);
+
+    const int atlasPixels = countOtherThanIn(split, kAtlasLeft, kSize, kBackground[0],
+                                            kBackground[1], kBackground[2]);
+    // The atlas square is sized by the short side of its panel, so it cannot fill the whole band.
+    check(atlasPixels > 500,
+          "o painel do atlas mostra o quadrado, pixels=" + std::to_string(atlasPixels));
+    const int modelPixels = countOtherThanIn(split, 0, kAtlasLeft, kBackground[0], kBackground[1],
+                                             kBackground[2]);
+    check(modelPixels > 10, "a vista 3D continua ao lado do atlas, pixels=" +
+                                 std::to_string(modelPixels));
+
+    // Islands that claim the same UV space must be impossible to miss in the atlas.
+    std::printf("      atlas: %s\n", editor.report().c_str());
+    const int overlapPixels =
+        countColorIn(split, kAtlasLeft, kSize, kOverlap[0], kOverlap[1], kOverlap[2], 8.0f);
+    check(overlapPixels > 0,
+          "ilhas sobrepostas aparecem em vermelho, pixels=" + std::to_string(overlapPixels));
+
+    // --- the atlas maps taps back to UV coordinates --------------------------------------
+    // Sampled before the message is built: reading the output array inside check() would let the
+    // compiler evaluate the text first and print the previous sample.
+    const auto sample = [&renderer](float x, float y) {
+        float point[2] = {-1.0f, -1.0f};
+        const bool hit = renderer.uvAt(x, y, point);
+        return AtlasSample{hit, point[0], point[1]};
+    };
+    const float centreX = static_cast<float>(kAtlasLeft) + static_cast<float>(kSize - kAtlasLeft) / 2.0f;
+    const float centreY = static_cast<float>(kSize) / 2.0f;
+    const AtlasSample atlasCentre = sample(centreX, centreY);
+    check(atlasCentre.hit && std::fabs(atlasCentre.u - 0.5f) < 2e-3f && std::fabs(atlasCentre.v - 0.5f) < 2e-3f,
+          "o centro do painel e o centro do atlas, u=" + std::to_string(atlasCentre.u) +
+              " v=" + std::to_string(atlasCentre.v));
+    check(!sample(1.0f, centreY).hit, "um toque na vista 3D nao cai no atlas");
+    if (atlasCentre.hit) {
+        const AtlasSample right = sample(centreX + 8.0f, centreY);
+        const float rightOffset = right.u - atlasCentre.u;
+        check(right.hit && rightOffset > 0.05f,
+              "mover para a direita aumenta U, dU=" + std::to_string(rightOffset));
+        const AtlasSample above = sample(centreX, centreY - 8.0f);
+        check(above.hit && above.v > atlasCentre.v,
+              "subir na tela aumenta V, v=" + std::to_string(above.v));
+        const AtlasSample below = sample(centreX, centreY + 8.0f);
+        check(below.hit && below.v < atlasCentre.v,
+              "descer na tela diminui V, v=" + std::to_string(below.v));
+
+        renderer.uvPan(8.0f, -8.0f);
+        const AtlasSample dragged = sample(centreX + 8.0f, centreY - 8.0f);
+        check(dragged.hit && std::fabs(dragged.u - atlasCentre.u) < 0.02f &&
+                  std::fabs(dragged.v - atlasCentre.v) < 0.02f,
+              "arrastar move o atlas junto com o dedo, u=" + std::to_string(dragged.u) +
+                  " v=" + std::to_string(dragged.v));
+
+        renderer.uvFrame();
+        renderer.uvZoom(2.0f);
+        const AtlasSample zoomed = sample(centreX + 8.0f, centreY);
+        check(zoomed.hit && std::fabs(zoomed.u - atlasCentre.u) < rightOffset * 0.7f,
+              "zoom aproxima o ponto do centro, dU=" + std::to_string(zoomed.u - atlasCentre.u));
+        renderer.uvFrame();
+        const AtlasSample framed = sample(centreX + 8.0f, centreY);
+        check(framed.hit && std::fabs(framed.u - atlasCentre.u) > rightOffset * 0.9f,
+              "reenquadrar devolve o zoom, dU=" + std::to_string(framed.u - atlasCentre.u));
+    }
+
+    // --- selecting an island repaints it --------------------------------------------------
+    const int amberBefore = countColorIn(split, kAtlasLeft, kSize, 0.98f, 0.72f, 0.22f, 8.0f);
+    check(editor.select(0, false), "selecionar a primeira ilha funciona");
+    renderer.draw();
+    const std::vector<unsigned char> selectedAtlas = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "ilha", selectedAtlas);
+    const int amberAfter =
+        countColorIn(selectedAtlas, kAtlasLeft, kSize, 0.98f, 0.72f, 0.22f, 8.0f);
+    check(amberAfter > amberBefore,
+          "a ilha selecionada aparece em ambar, antes=" + std::to_string(amberBefore) +
+              " depois=" + std::to_string(amberAfter));
+
+    // --- moving an island moves its pixels ------------------------------------------------
+    editor.translate(0.2f, 0.0f);
+    renderer.draw();
+    const std::vector<unsigned char> shifted = readPixels();
+    int shiftedChannels = 0;
+    for (size_t i = 0; i < selectedAtlas.size(); ++i) {
+        if (std::abs(static_cast<int>(selectedAtlas[i]) - static_cast<int>(shifted[i])) > 4) {
+            ++shiftedChannels;
+        }
+    }
+    check(shiftedChannels > 100,
+          "arrastar uma ilha muda o atlas, canais=" + std::to_string(shiftedChannels));
+
+    // --- repacking separates the islands -----------------------------------------------
+    // Once the islands no longer share UV space the warning colour has to leave the atlas: the
+    // only way it comes back is a genuine overlap.
+    check(editor.repack(4), "reagrupar as ilhas no atlas funciona");
+    renderer.draw();
+    const std::vector<unsigned char> repacked = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "repack", repacked);
+    const int overlapAfterRepack =
+        countColorIn(repacked, kAtlasLeft, kSize, kOverlap[0], kOverlap[1], kOverlap[2], 8.0f);
+    check(overlapAfterRepack == 0,
+          "reagrupadas, nenhuma ilha aparece em vermelho, pixels=" +
+              std::to_string(overlapAfterRepack));
+    const int amberRepacked =
+        countColorIn(repacked, kAtlasLeft, kSize, 0.98f, 0.72f, 0.22f, 8.0f);
+    check(amberRepacked > 0,
+          "a selecao continua visivel depois de reagrupar, pixels=" +
+              std::to_string(amberRepacked));
+    int repackChannels = 0;
+    for (size_t i = 0; i < shifted.size(); ++i) {
+        if (std::abs(static_cast<int>(shifted[i]) - static_cast<int>(repacked[i])) > 4) {
+            ++repackChannels;
+        }
+    }
+    check(repackChannels > 100,
+          "reagrupar muda o desenho do atlas, canais=" + std::to_string(repackChannels));
+
+    // --- the other view modes -------------------------------------------------------------
+    renderer.setViewMode(g3d::Renderer::kViewAtlasOnly);
+    renderer.draw();
+    const std::vector<unsigned char> onlyAtlas = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "so_atlas", onlyAtlas);
+    check(renderer.pickAt(centreY, centreY) == -1, "na vista do atlas um toque nao seleciona malha");
+    const int leftIsAtlas = countOtherThanIn(onlyAtlas, 0, kAtlasLeft, kBackground[0],
+                                             kBackground[1], kBackground[2]);
+    check(leftIsAtlas > 1000,
+          "o atlas ocupa a superficie inteira, pixels=" + std::to_string(leftIsAtlas));
+
+    // An atlas with no session open still shows its frame, and with nothing painted over it this is
+    // where the grid and the border are unambiguously visible.
+    editor.cancel();
+    renderer.draw();
+    const std::vector<unsigned char> atlasEmpty = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "vazio", atlasEmpty);
+    check(countColorIn(atlasEmpty, 0, kSize, kGrid[0], kGrid[1], kGrid[2]) > 0,
+          "a grade do atlas aparece sem edicao aberta");
+    check(countColorIn(atlasEmpty, 0, kSize, kBorder[0], kBorder[1], kBorder[2]) > 0,
+          "a borda do atlas aparece sem edicao aberta");
+    check(countColorIn(atlasEmpty, 0, kSize, kOverlap[0], kOverlap[1], kOverlap[2], 8.0f) == 0,
+          "sem edicao aberta nao ha aviso de sobreposicao");
+    // The whole surface is the atlas now, so its centre moved to the centre of the surface.
+    const AtlasSample emptyCentre = sample(centreY, centreY);
+    check(emptyCentre.hit && std::fabs(emptyCentre.u - 0.5f) < 2e-3f,
+          "o atlas vazio continua mapeando toques, u=" + std::to_string(emptyCentre.u));
+
+    renderer.setViewMode(g3d::Renderer::kViewThreeDimensional);
+    renderer.draw();
+    check(glGetError() == GL_NO_ERROR, "fechar a sessao nao deixa erro de GL");
+    check(renderer.pickAt(centreY, centreY) >= 0, "a vista 3D volta a aceitar toques");
 
     std::printf("\n%d verificacoes, %d falhas\n", checks, failures);
     eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);

@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <limits>
 #include <set>
+#include <unordered_map>
 #include <utility>
 
 #include <glm/gtc/matrix_inverse.hpp>
@@ -26,6 +27,7 @@
 #include "core/document.hpp"
 #include "core/mesh.hpp"
 #include "core/primitives.hpp"
+#include "uv/uv_editor.hpp"
 
 namespace {
 
@@ -36,6 +38,14 @@ constexpr float kFovDegrees = 45.0f;
 constexpr float kBackground[3] = {0.094f, 0.106f, 0.125f};
 constexpr float kOutlineColor[4] = {0.98f, 0.72f, 0.22f, 1.0f};
 constexpr float kPi = 3.14159265358979323846f;
+constexpr float kAtlasBackground[4] = {0.133f, 0.153f, 0.184f, 1.0f};
+constexpr float kAtlasGrid[4] = {0.239f, 0.263f, 0.310f, 1.0f};
+constexpr float kAtlasBorder[4] = {0.478f, 0.518f, 0.584f, 1.0f};
+constexpr float kAtlasOverlap[4] = {0.898f, 0.267f, 0.239f, 1.0f};
+// The atlas square keeps a little margin so its border is never glued to the edge of the panel.
+constexpr float kAtlasMarginRatio = 0.92f;
+// Two triangles drawn before everything else, so the grid and the islands have something to sit on.
+constexpr uint32_t kAtlasBackgroundVertices = 6;
 
 const char *kVertexShader = R"GLSL(#version 300 es
 layout(location = 0) in vec3 aPosition;
@@ -68,6 +78,29 @@ void main() {
     float lit = max(dot(normal, normalize(uLightDir)), 0.0);
     float sky = 0.5 + 0.5 * normal.y;
     outColor = vec4(uColor.rgb * (0.24 + 0.62 * lit + 0.14 * sky), 1.0);
+}
+)GLSL";
+
+// The atlas layer is flat: every vertex is already in atlas coordinates and the only transform is
+// a scale plus a translation, so no matrix and no depth are involved.
+const char *kUvVertexShader = R"GLSL(#version 300 es
+layout(location = 0) in vec2 aPosition;
+layout(location = 1) in vec4 aColor;
+uniform vec2 uScale;
+uniform vec2 uOffset;
+out vec4 vColor;
+void main() {
+    vColor = aColor;
+    gl_Position = vec4(aPosition * uScale + uOffset, 0.0, 1.0);
+}
+)GLSL";
+
+const char *kUvFragmentShader = R"GLSL(#version 300 es
+precision mediump float;
+in vec4 vColor;
+layout(location = 0) out vec4 outColor;
+void main() {
+    outColor = vColor;
 }
 )GLSL";
 
@@ -157,6 +190,27 @@ bool rayHitsTriangle(const float *position, const float *direction, const float 
     return true;
 }
 
+// Golden-angle hues keep neighbouring islands visibly different without a palette to maintain. The
+// offset starts the sequence on blue, so no island colour resembles the amber of the selection or
+// the red of an overlap.
+void islandHue(uint32_t index, float out[3]) {
+    const float hue = std::fmod(static_cast<float>(index) * 0.618034f + 0.45f, 1.0f);
+    const float saturation = 0.52f;
+    const float value = 0.88f;
+    const float six = hue * 6.0f;
+    const float offset[3] = {0.0f, 4.0f, 2.0f};
+    for (int channel = 0; channel < 3; ++channel) {
+        const float k = std::fmod(six + offset[channel], 6.0f);
+        const float ramp = std::max(0.0f, std::min({k, 4.0f - k, 1.0f}));
+        out[channel] = value - value * saturation * ramp;
+    }
+}
+
+uint64_t uvEdgeKey(uint32_t a, uint32_t b) {
+    return a < b ? (static_cast<uint64_t>(a) << 32) | static_cast<uint64_t>(b)
+                 : (static_cast<uint64_t>(b) << 32) | static_cast<uint64_t>(a);
+}
+
 }  // namespace
 
 namespace g3d {
@@ -171,15 +225,63 @@ bool Renderer::onContextCreated() {
     // forgotten instead of deleted.
     items_.clear();
     program_ = 0;
+    uvProgram_ = 0;
+    uvVertexArray_ = 0;
+    uvVertexBuffer_ = 0;
+    uvUniformScale_ = -1;
+    uvUniformOffset_ = -1;
+    uvGridCount_ = 0;
+    uvTriCount_ = 0;
+    uvEdgeCount_ = 0;
+    uvGeometryStale_ = true;
+    uvLayoutRevision_ = 0;
     contextReady_ = false;
 
     if (!buildShaders()) {
+        return false;
+    }
+    if (!buildUvShader()) {
         return false;
     }
     glEnable(GL_DEPTH_TEST);
     glClearColor(kBackground[0], kBackground[1], kBackground[2], 1.0f);
     contextReady_ = true;
     uploadScene();
+    return true;
+}
+
+bool Renderer::buildUvShader() {
+    const GLuint vertex = compileShader(GL_VERTEX_SHADER, kUvVertexShader);
+    const GLuint fragment = compileShader(GL_FRAGMENT_SHADER, kUvFragmentShader);
+    if (vertex == 0 || fragment == 0) {
+        if (vertex != 0) {
+            glDeleteShader(vertex);
+        }
+        if (fragment != 0) {
+            glDeleteShader(fragment);
+        }
+        return false;
+    }
+    uvProgram_ = glCreateProgram();
+    glAttachShader(uvProgram_, vertex);
+    glAttachShader(uvProgram_, fragment);
+    glLinkProgram(uvProgram_);
+    glDeleteShader(vertex);
+    glDeleteShader(fragment);
+
+    GLint ok = GL_FALSE;
+    glGetProgramiv(uvProgram_, GL_LINK_STATUS, &ok);
+    if (ok != GL_TRUE) {
+        char log[1024];
+        GLsizei length = 0;
+        glGetProgramInfoLog(uvProgram_, sizeof(log), &length, log);
+        G3D_LOG_ERROR("atlas program link: %.*s", static_cast<int>(length), log);
+        glDeleteProgram(uvProgram_);
+        uvProgram_ = 0;
+        return false;
+    }
+    uvUniformScale_ = glGetUniformLocation(uvProgram_, "uScale");
+    uvUniformOffset_ = glGetUniformLocation(uvProgram_, "uOffset");
     return true;
 }
 
@@ -402,12 +504,14 @@ glm::vec3 Renderer::eyePosition() const {
     return center_ + direction * distance_;
 }
 
-glm::mat4 Renderer::viewProjection() const {
+glm::mat4 Renderer::viewProjection(int width, int height) const {
     std::lock_guard<std::mutex> guard(cameraMutex_);
     const glm::vec3 direction(std::cos(pitch_) * std::sin(yaw_), std::sin(pitch_),
                               std::cos(pitch_) * std::cos(yaw_));
     const glm::vec3 eye = center_ + direction * distance_;
-    const float aspect = static_cast<float>(width_) / static_cast<float>(height_);
+    const int safeWidth = width > 0 ? width : 1;
+    const int safeHeight = height > 0 ? height : 1;
+    const float aspect = static_cast<float>(safeWidth) / static_cast<float>(safeHeight);
     const float nearPlane = std::max(radius_ * 0.02f, 0.01f);
     const float farPlane = std::max(radius_ * 60.0f, (distance_ + radius_) * 6.0f);
     const glm::mat4 projection =
@@ -416,47 +520,104 @@ glm::mat4 Renderer::viewProjection() const {
     return projection * view;
 }
 
+// The surface is split between the 3D preview and the atlas. Rectangles are in surface pixels with
+// Y growing downwards, matching the touch coordinates the view receives.
+void Renderer::rectOf(int part, int out[4]) const {
+    int surfaceWidth = 1;
+    int surfaceHeight = 1;
+    int mode = kViewThreeDimensional;
+    {
+        std::lock_guard<std::mutex> guard(cameraMutex_);
+        surfaceWidth = width_;
+        surfaceHeight = height_;
+        mode = viewMode_;
+    }
+    out[0] = 0;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    const int split = static_cast<int>(static_cast<float>(surfaceWidth) * 0.55f);
+    if (part == 0) {
+        if (mode == kViewAtlasOnly) {
+            return;
+        }
+        out[2] = mode == kViewSplit ? split : surfaceWidth;
+        out[3] = surfaceHeight;
+        return;
+    }
+    if (mode == kViewThreeDimensional) {
+        return;
+    }
+    if (mode == kViewSplit) {
+        out[0] = split;
+        out[2] = std::max(surfaceWidth - split, 1);
+        out[3] = surfaceHeight;
+        return;
+    }
+    out[2] = surfaceWidth;
+    out[3] = surfaceHeight;
+}
+
 void Renderer::draw() {
     if (!contextReady_) {
         return;
     }
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    if (items_.empty()) {
-        return;
+
+    int surfaceWidth = 1;
+    int surfaceHeight = 1;
+    {
+        std::lock_guard<std::mutex> guard(cameraMutex_);
+        surfaceWidth = width_;
+        surfaceHeight = height_;
     }
 
-    const glm::mat4 matrix = this->viewProjection();
-    glUseProgram(program_);
-    glUniformMatrix4fv(uniformViewProj_, 1, GL_FALSE, &matrix[0][0]);
-    glUniform3f(uniformLightDir_, 0.35f, 0.85f, 0.4f);
-    glUniform1i(uniformShading_, shadingMode_);
+    int three[4];
+    rectOf(0, three);
+    if (three[2] > 0 && !items_.empty()) {
+        // GL viewports are measured from the bottom left, the surface rectangles are not.
+        glViewport(three[0], surfaceHeight - three[1] - three[3], three[2], three[3]);
+        const glm::mat4 matrix = this->viewProjection(three[2], three[3]);
+        glUseProgram(program_);
+        glUniformMatrix4fv(uniformViewProj_, 1, GL_FALSE, &matrix[0][0]);
+        glUniform3f(uniformLightDir_, 0.35f, 0.85f, 0.4f);
+        glUniform1i(uniformShading_, shadingMode_);
 
-    // Push the triangles a little away from the camera so the selection outline, which sits on the
-    // very same edges, wins the depth test instead of flickering against it.
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(1.0f, 2.0f);
-    for (Item &item : items_) {
-        glBindVertexArray(item.vertexArray);
-        glUniform4f(uniformColor_, item.color[0], item.color[1], item.color[2], item.color[3]);
-        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(item.indexCount), GL_UNSIGNED_INT,
-                       reinterpret_cast<const void *>(0));
-    }
-    glDisable(GL_POLYGON_OFFSET_FILL);
-
-    // Read every frame so a tap in the hierarchy panel highlights without re-uploading geometry.
-    const int selected = Document::instance().selected();
-    if (selected >= 0 && static_cast<size_t>(selected) < items_.size()) {
-        Item &item = items_[static_cast<size_t>(selected)];
-        buildLineGeometry(item);
-        if (item.lineCount > 0) {
-            glUniform1i(uniformShading_, 2);
-            glUniform4fv(uniformColor_, 1, kOutlineColor);
-            glBindVertexArray(item.lineVertexArray);
-            glDrawElements(GL_LINES, static_cast<GLsizei>(item.lineCount), GL_UNSIGNED_INT,
+        // Push the triangles a little away from the camera so the selection outline, which sits on
+        // the very same edges, wins the depth test instead of flickering against it.
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1.0f, 2.0f);
+        for (Item &item : items_) {
+            glBindVertexArray(item.vertexArray);
+            glUniform4f(uniformColor_, item.color[0], item.color[1], item.color[2], item.color[3]);
+            glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(item.indexCount), GL_UNSIGNED_INT,
                            reinterpret_cast<const void *>(0));
         }
+        glDisable(GL_POLYGON_OFFSET_FILL);
+
+        // Read every frame so a tap in the hierarchy panel highlights without re-uploading.
+        const int selected = Document::instance().selected();
+        if (selected >= 0 && static_cast<size_t>(selected) < items_.size()) {
+            Item &item = items_[static_cast<size_t>(selected)];
+            buildLineGeometry(item);
+            if (item.lineCount > 0) {
+                glUniform1i(uniformShading_, 2);
+                glUniform4fv(uniformColor_, 1, kOutlineColor);
+                glBindVertexArray(item.lineVertexArray);
+                glDrawElements(GL_LINES, static_cast<GLsizei>(item.lineCount), GL_UNSIGNED_INT,
+                               reinterpret_cast<const void *>(0));
+            }
+        }
+        glBindVertexArray(0);
     }
-    glBindVertexArray(0);
+
+    int atlas[4];
+    rectOf(1, atlas);
+    if (atlas[2] > 0 && atlas[3] > 0) {
+        glViewport(atlas[0], surfaceHeight - atlas[1] - atlas[3], atlas[2], atlas[3]);
+        drawUv();
+    }
+    glViewport(0, 0, surfaceWidth, surfaceHeight);
 }
 
 void Renderer::orbit(float dxPixels, float dyPixels) {
@@ -516,21 +677,22 @@ int Renderer::pickAt(float xPixels, float yPixels) {
         return -1;
     }
 
-    const glm::mat4 matrix = this->viewProjection();
+    int rect[4];
+    rectOf(0, rect);
+    if (rect[2] <= 0 || xPixels < static_cast<float>(rect[0]) ||
+        xPixels >= static_cast<float>(rect[0] + rect[2]) ||
+        yPixels < static_cast<float>(rect[1]) ||
+        yPixels >= static_cast<float>(rect[1] + rect[3])) {
+        return -1;  // The tap landed on the atlas, not on the model.
+    }
+
+    const glm::mat4 matrix = this->viewProjection(rect[2], rect[3]);
     const glm::mat4 inverted = glm::inverse(matrix);
     const glm::vec3 eye = eyePosition();
 
-    int viewportWidth = 1;
-    int viewportHeight = 1;
-    {
-        std::lock_guard<std::mutex> guard(cameraMutex_);
-        viewportWidth = width_;
-        viewportHeight = height_;
-    }
-
-    // Device pixels map straight to the viewport: the view fills the window.
-    const float ndcX = 2.0f * xPixels / static_cast<float>(viewportWidth) - 1.0f;
-    const float ndcY = 1.0f - 2.0f * yPixels / static_cast<float>(viewportHeight);
+    // Pixels inside the rectangle map onto the clip space of that rectangle.
+    const float ndcX = 2.0f * (xPixels - rect[0]) / static_cast<float>(rect[2]) - 1.0f;
+    const float ndcY = 1.0f - 2.0f * (yPixels - rect[1]) / static_cast<float>(rect[3]);
     // GLM was configured with GLM_FORCE_DEPTH_ZERO_TO_ONE, so window depth runs from 0 to 1.
     const glm::vec4 nearPoint = inverted * glm::vec4(ndcX, ndcY, 0.0f, 1.0f);
     const glm::vec4 farPoint = inverted * glm::vec4(ndcX, ndcY, 1.0f, 1.0f);
@@ -563,5 +725,272 @@ int Renderer::pickAt(float xPixels, float yPixels) {
 }
 
 void Renderer::setShadingMode(int mode) { shadingMode_ = mode == 1 ? 1 : 0; }
+
+void Renderer::setViewMode(int mode) {
+    std::lock_guard<std::mutex> guard(cameraMutex_);
+    viewMode_ = mode == kViewSplit ? kViewSplit : (mode == kViewAtlasOnly ? kViewAtlasOnly
+                                                                          : kViewThreeDimensional);
+}
+
+void Renderer::uvPan(float dxPixels, float dyPixels) {
+    std::lock_guard<std::mutex> guard(cameraMutex_);
+    uvPanX_ += dxPixels;
+    // Surface pixels grow downwards, and the atlas is drawn the same way, so a drag follows
+    // the finger exactly.
+    uvPanY_ += dyPixels;
+}
+
+void Renderer::uvZoom(float factor) {
+    if (factor <= 0.0f) {
+        return;
+    }
+    std::lock_guard<std::mutex> guard(cameraMutex_);
+    uvZoomFactor_ = std::min(std::max(uvZoomFactor_ * factor, 0.2f), 20.0f);
+}
+
+void Renderer::uvFrame() {
+    std::lock_guard<std::mutex> guard(cameraMutex_);
+    uvZoomFactor_ = 1.0f;
+    uvPanX_ = 0.0f;
+    uvPanY_ = 0.0f;
+}
+
+void Renderer::uvAffine(const int rect[4], float out[4]) const {
+    float zoom = 1.0f;
+    float panX = 0.0f;
+    float panY = 0.0f;
+    {
+        std::lock_guard<std::mutex> guard(cameraMutex_);
+        zoom = uvZoomFactor_;
+        panX = uvPanX_;
+        panY = uvPanY_;
+    }
+    const float width = rect[2] > 0 ? static_cast<float>(rect[2]) : 1.0f;
+    const float height = rect[3] > 0 ? static_cast<float>(rect[3]) : 1.0f;
+    // The atlas stays square in pixels, so both axes are sized by the shorter side.
+    const float side = std::min(width, height) * kAtlasMarginRatio * zoom;
+    out[0] = 2.0f * side / width;
+    out[1] = 2.0f * side / height;
+    out[2] = 2.0f * panX / width - out[0] * 0.5f;
+    // Clip Y grows upwards while surface Y grows downwards: the minus sign puts V=1 at the top.
+    out[3] = -2.0f * panY / height - out[1] * 0.5f;
+}
+
+bool Renderer::uvAt(float xPixels, float yPixels, float out[2]) {
+    int rect[4];
+    rectOf(1, rect);
+    if (rect[2] <= 0 || rect[3] <= 0) {
+        return false;
+    }
+    if (xPixels < static_cast<float>(rect[0]) || xPixels >= static_cast<float>(rect[0] + rect[2]) ||
+        yPixels < static_cast<float>(rect[1]) || yPixels >= static_cast<float>(rect[1] + rect[3])) {
+        return false;  // The tap landed on the 3D preview, not on the atlas.
+    }
+    float affine[4];
+    uvAffine(rect, affine);
+    const float ndcX = 2.0f * (xPixels - static_cast<float>(rect[0])) / static_cast<float>(rect[2]) -
+                       1.0f;
+    const float ndcY = 1.0f - 2.0f * (yPixels - static_cast<float>(rect[1])) /
+                              static_cast<float>(rect[3]);
+    out[0] = (ndcX - affine[2]) / affine[0];
+    out[1] = (ndcY - affine[3]) / affine[1];
+    return out[0] >= 0.0f && out[0] <= 1.0f && out[1] >= 0.0f && out[1] <= 1.0f;
+}
+
+// Atlas geometry is rebuilt only when the editing session changed, because every transform copies
+// the whole layout out of the session.
+void Renderer::rebuildUvGeometry() {
+    UvEditor &editor = UvEditor::instance();
+    const uint64_t revision = editor.revision();
+    if (!uvGeometryStale_ && revision == uvLayoutRevision_) {
+        return;
+    }
+    uvGeometryStale_ = false;
+    uvLayoutRevision_ = revision;
+
+    std::vector<float> vertices;  // Six floats per vertex: atlas position, then colour.
+    const auto pushVertex = [&vertices](float u, float v, const float color[4]) {
+        vertices.insert(vertices.end(), {u, v, color[0], color[1], color[2], color[3]});
+    };
+    const auto pushLine = [&pushVertex](float u0, float v0, float u1, float v1,
+                                        const float color[4]) {
+        pushVertex(u0, v0, color);
+        pushVertex(u1, v1, color);
+    };
+
+    UvLayout layout;
+    const bool hasLayout = editor.layout(layout) && !layout.indices.empty();
+    std::set<uint32_t> selectedSet(layout.selected.begin(), layout.selected.end());
+    std::set<uint32_t> overlapSet(layout.overlapping.begin(), layout.overlapping.end());
+
+    // Colour of one island, written into color: amber when selected, red while it overlaps another
+    // island, and a hue otherwise. Selection wins because the user needs to see what a tool acts on.
+    float color[4];
+    const auto islandColor = [&selectedSet, &overlapSet, &color](uint32_t island, float alpha) {
+        if (selectedSet.count(island) != 0) {
+            std::copy(std::begin(kOutlineColor), std::end(kOutlineColor), &color[0]);
+        } else if (overlapSet.count(island) != 0) {
+            std::copy(std::begin(kAtlasOverlap), std::end(kAtlasOverlap), &color[0]);
+        } else {
+            islandHue(island, &color[0]);
+            color[3] = 1.0f;
+        }
+        color[3] = alpha;
+    };
+    const auto uvOf = [&layout](uint32_t vertex) {
+        return vertex * 2 + 1 < layout.uvs.size();
+    };
+
+    const float background[kAtlasBackgroundVertices][2] = {
+        {0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}};
+    for (const auto &corner : background) {
+        pushVertex(corner[0], corner[1], kAtlasBackground);
+    }
+
+    for (int step = 0; step <= 4; ++step) {
+        const float position = static_cast<float>(step) * 0.25f;
+        const bool border = (step == 0 || step == 4);
+        const float *gridColor = border ? kAtlasBorder : kAtlasGrid;
+        pushLine(position, 0.0f, position, 1.0f, gridColor);
+        pushLine(0.0f, position, 1.0f, position, gridColor);
+    }
+    uvGridCount_ = static_cast<uint32_t>(vertices.size() / 6) - kAtlasBackgroundVertices;
+
+    // Edges are classified by who owns them: an edge used twice inside one island is interior and
+    // is drawn dim, everything else is a seam or a silhouette and is drawn bright.
+    struct EdgeInfo {
+        uint32_t island = kNoIsland;
+        uint32_t uses = 0;
+    };
+    std::unordered_map<uint64_t, EdgeInfo> edges;
+    for (size_t face = 0; hasLayout && face + 2 < layout.indices.size(); face += 3) {
+        const uint32_t corner[3] = {layout.indices[face], layout.indices[face + 1],
+                                    layout.indices[face + 2]};
+        if (!uvOf(corner[0]) || !uvOf(corner[1]) || !uvOf(corner[2])) {
+            continue;
+        }
+        const uint32_t island = face / 3 < layout.faceIsland.size()
+                                    ? layout.faceIsland[face / 3]
+                                    : kNoIsland;
+
+        // Translucent fills make an overlap visible before the report is ever read.
+        islandColor(island, selectedSet.count(island) != 0 ? 0.45f : 0.28f);
+        for (const uint32_t index : corner) {
+            pushVertex(layout.uvs[index * 2], layout.uvs[index * 2 + 1], color);
+        }
+
+        for (int edge = 0; edge < 3; ++edge) {
+            const uint32_t a = corner[edge];
+            const uint32_t b = corner[(edge + 1) % 3];
+            EdgeInfo &info = edges[uvEdgeKey(a, b)];
+            if (info.uses == 0) {
+                info.island = island;
+            } else if (info.island != island) {
+                info.island = kNoIsland;  // Two islands meet on this edge.
+            }
+            ++info.uses;
+        }
+    }
+    uvTriCount_ = static_cast<uint32_t>(vertices.size() / 6) - kAtlasBackgroundVertices -
+                  uvGridCount_;
+
+    // Warnings are drawn last, so an outline can never be buried under the islands it warns about:
+    // stacked islands share the very same pixels and only the last stroke survives.
+    const auto edgeRank = [&selectedSet, &overlapSet](const EdgeInfo &info) {
+        if (info.island == kNoIsland) {
+            return 1;  // A seam between two islands.
+        }
+        if (selectedSet.count(info.island) != 0) {
+            return 3;
+        }
+        return overlapSet.count(info.island) != 0 ? 2 : 0;
+    };
+    std::vector<std::pair<uint64_t, EdgeInfo>> ordered(edges.begin(), edges.end());
+    std::stable_sort(ordered.begin(), ordered.end(),
+                     [&edgeRank](const std::pair<uint64_t, EdgeInfo> &left,
+                                 const std::pair<uint64_t, EdgeInfo> &right) {
+                         return edgeRank(left.second) < edgeRank(right.second);
+                     });
+
+    for (const auto &entry : ordered) {
+        const EdgeInfo &info = entry.second;
+        const uint32_t a = static_cast<uint32_t>(entry.first >> 32);
+        const uint32_t b = static_cast<uint32_t>(entry.first & 0xffffffffu);
+        if (info.island == kNoIsland) {
+            std::copy(std::begin(kAtlasBorder), std::end(kAtlasBorder), &color[0]);
+        } else {
+            islandColor(info.island, 1.0f);
+        }
+        float *lineColor = &color[0];
+        if (info.uses == 2 && info.island != kNoIsland) {
+            // Interior edges fade towards the atlas background so the silhouette reads clearly.
+            for (int channel = 0; channel < 3; ++channel) {
+                lineColor[channel] = 0.35f * lineColor[channel] + 0.65f * kAtlasBackground[channel];
+            }
+        }
+        pushLine(layout.uvs[a * 2], layout.uvs[a * 2 + 1], layout.uvs[b * 2],
+                 layout.uvs[b * 2 + 1], lineColor);
+    }
+    uvEdgeCount_ = static_cast<uint32_t>(vertices.size() / 6) - kAtlasBackgroundVertices -
+                   uvGridCount_ - uvTriCount_;
+    if (vertices.empty()) {
+        return;
+    }
+
+    if (uvVertexArray_ == 0) {
+        glGenVertexArrays(1, &uvVertexArray_);
+    }
+    if (uvVertexBuffer_ == 0) {
+        glGenBuffers(1, &uvVertexBuffer_);
+    }
+    glBindVertexArray(uvVertexArray_);
+    glBindBuffer(GL_ARRAY_BUFFER, uvVertexBuffer_);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(float)),
+                 vertices.data(), GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                          reinterpret_cast<void *>(2 * sizeof(float)));
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glBindVertexArray(0);
+}
+
+void Renderer::drawUv() {
+    if (uvProgram_ == 0) {
+        return;
+    }
+    int rect[4];
+    rectOf(1, rect);
+    if (rect[2] <= 0 || rect[3] <= 0) {
+        return;
+    }
+    rebuildUvGeometry();
+    if (uvGridCount_ == 0 && uvTriCount_ == 0 && uvEdgeCount_ == 0) {
+        return;
+    }
+
+    float affine[4];
+    uvAffine(rect, affine);
+    glUseProgram(uvProgram_);
+    glUniform2f(uvUniformScale_, affine[0], affine[1]);
+    glUniform2f(uvUniformOffset_, affine[2], affine[3]);
+
+    // The atlas is flat: no depth, and the island fills blend so overlaps pile up visibly.
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBindVertexArray(uvVertexArray_);
+    uint32_t first = 0;
+    glDrawArrays(GL_TRIANGLES, static_cast<GLint>(first), kAtlasBackgroundVertices);
+    first += kAtlasBackgroundVertices;
+    glDrawArrays(GL_LINES, static_cast<GLint>(first), static_cast<GLsizei>(uvGridCount_));
+    first += uvGridCount_;
+    glDrawArrays(GL_TRIANGLES, static_cast<GLint>(first), static_cast<GLsizei>(uvTriCount_));
+    first += uvTriCount_;
+    glDrawArrays(GL_LINES, static_cast<GLint>(first), static_cast<GLsizei>(uvEdgeCount_));
+    glBindVertexArray(0);
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+}
 
 }  // namespace g3d

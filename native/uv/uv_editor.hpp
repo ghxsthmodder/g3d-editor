@@ -52,6 +52,8 @@ public:
     std::string report();
     std::string describe();
     uint32_t meshIndex();
+    // Changes on every edit, so the renderer can rebuild its atlas geometry only when needed.
+    uint64_t revision();
     bool layout(UvLayout &out);
 
 private:

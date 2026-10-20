@@ -162,6 +162,17 @@ bool UvEditor::repack(uint32_t paddingTexels) {
     return edit([paddingTexels](UvSession &session) { return session.repack(paddingTexels); });
 }
 
+bool UvEditor::selectionPivot(float out[2]) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    float box[4];
+    if (!active_ || !session_.selectionBounds(box)) {
+        return false;
+    }
+    out[0] = (box[0] + box[2]) * 0.5f;
+    out[1] = (box[1] + box[3]) * 0.5f;
+    return true;
+}
+
 std::string UvEditor::report() {
     std::lock_guard<std::mutex> guard(mutex_);
     if (!active_) {

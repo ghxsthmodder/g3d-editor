@@ -7,6 +7,8 @@ import android.provider.OpenableColumns
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -20,8 +22,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Model preview screen of phase 2: import a model, orbit it, and pick which mesh the tools will
- * act on. UV editing and texture composition arrive in the following phases.
+ * Editor screen. Phase 2 brought the import and the 3D preview; phase 3 adds the UV workspace:
+ * a session that previews xatlas results, the atlas the renderer draws next to the model, and the
+ * island tools that edit it before anything reaches the scene.
  */
 class MainActivity : AppCompatActivity(), ModelView.Listener {
 
@@ -35,6 +38,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
     private var selectedMesh = -1
     private var busy = false
+    private var uvOpen = false
+    private var uvMesh = -1
 
     private lateinit var viewport: ModelView
     private lateinit var hierarchyPanel: View
@@ -45,6 +50,12 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var importButton: MaterialButton
     private lateinit var frameButton: MaterialButton
     private lateinit var shadingGroup: MaterialButtonToggleGroup
+    private lateinit var viewGroup: MaterialButtonToggleGroup
+    private lateinit var uvPanel: View
+    private lateinit var uvStatusText: TextView
+    private lateinit var uvPaddingField: EditText
+    private lateinit var uvResolutionField: EditText
+    private lateinit var uvAdditiveCheck: CheckBox
 
     private val openModel =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -65,6 +76,12 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         importButton = findViewById(R.id.importModel)
         frameButton = findViewById(R.id.frameScene)
         shadingGroup = findViewById(R.id.shadingGroup)
+        viewGroup = findViewById(R.id.viewGroup)
+        uvPanel = findViewById(R.id.uvPanel)
+        uvStatusText = findViewById(R.id.uvStatus)
+        uvPaddingField = findViewById(R.id.uvPadding)
+        uvResolutionField = findViewById(R.id.uvResolution)
+        uvAdditiveCheck = findViewById(R.id.uvAdditive)
 
         viewport.listener = this
         importButton.setOnClickListener { openModel.launch(arrayOf("*/*")) }
@@ -72,20 +89,78 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             viewport.frameScene()
             report("câmera ajustada ao conteúdo")
         }
-        findViewById<View>(R.id.togglePanel).setOnClickListener {
-            hierarchyPanel.visibility = if (hierarchyPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-        }
+        findViewById<View>(R.id.togglePanel).setOnClickListener { toggleSidePanel() }
+        findViewById<View>(R.id.openUvEditor).setOnClickListener { openUvEditor() }
         shadingGroup.check(R.id.shadingSolid)
         shadingGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
                 viewport.setShading(if (checkedId == R.id.shadingNormals) 1 else 0)
             }
         }
+        viewGroup.check(R.id.viewThreeD)
+        viewGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                viewport.setViewMode(
+                    when (checkedId) {
+                        R.id.viewSplit -> VIEW_SPLIT
+                        R.id.viewAtlas -> VIEW_ATLAS
+                        else -> VIEW_THREE_D
+                    }
+                )
+            }
+        }
+
+        uvAdditiveCheck.setOnCheckedChangeListener { _, checked ->
+            viewport.additiveSelection = checked
+            // Silent while the editor closes, which clears the box as part of resetting the tools.
+            if (uvOpen) {
+                report(
+                    getString(
+                        if (checked) R.string.status_uv_additive_on else R.string.status_uv_additive_off
+                    )
+                )
+            }
+        }
+        findViewById<View>(R.id.uvGenerate).setOnClickListener { generateUv() }
+        findViewById<View>(R.id.uvSelectAll).setOnClickListener {
+            uvTool(getString(R.string.uv_name_select_all)) {
+                Native.nativeUvSelectAll()
+                true
+            }
+        }
+        findViewById<View>(R.id.uvSelectNone).setOnClickListener {
+            uvTool(getString(R.string.uv_name_select_none)) {
+                Native.nativeUvClearSelection()
+                true
+            }
+        }
+        findViewById<View>(R.id.uvMoveLeft).setOnClickListener { moveIslands(-MOVE_STEP, 0.0f) }
+        findViewById<View>(R.id.uvMoveRight).setOnClickListener { moveIslands(MOVE_STEP, 0.0f) }
+        findViewById<View>(R.id.uvMoveDown).setOnClickListener { moveIslands(0.0f, -MOVE_STEP) }
+        findViewById<View>(R.id.uvMoveUp).setOnClickListener { moveIslands(0.0f, MOVE_STEP) }
+        findViewById<View>(R.id.uvRotateMinus90).setOnClickListener { rotateIslands(-90.0f) }
+        findViewById<View>(R.id.uvRotateMinus15).setOnClickListener { rotateIslands(-15.0f) }
+        findViewById<View>(R.id.uvRotatePlus15).setOnClickListener { rotateIslands(15.0f) }
+        findViewById<View>(R.id.uvRotatePlus90).setOnClickListener { rotateIslands(90.0f) }
+        findViewById<View>(R.id.uvScaleDown).setOnClickListener { scaleIslands(0.8f) }
+        findViewById<View>(R.id.uvScaleUp).setOnClickListener { scaleIslands(1.25f) }
+        findViewById<View>(R.id.uvFit).setOnClickListener {
+            uvTool(getString(R.string.uv_name_fit)) { Native.nativeUvFit() }
+        }
+        findViewById<View>(R.id.uvRepack).setOnClickListener { repackIslands() }
+        findViewById<View>(R.id.uvFrameAtlas).setOnClickListener {
+            viewport.frameAtlas()
+            report("atlas reenquadrado")
+        }
+        findViewById<View>(R.id.uvApply).setOnClickListener { applyUv() }
+        findViewById<View>(R.id.uvCancel).setOnClickListener { cancelUv() }
 
         if (!Native.isAvailable) {
             importButton.isEnabled = false
             frameButton.isEnabled = false
             shadingGroup.isEnabled = false
+            viewGroup.isEnabled = false
+            findViewById<View>(R.id.openUvEditor).isEnabled = false
             viewport.isEnabled = false
             appendLine(getString(R.string.status_native_missing, Native.loadError ?: "?"))
             renderLog()
@@ -120,6 +195,206 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             return true
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    // --- side panels ---------------------------------------------------------------------
+
+    /** The right column shows the hierarchy or the UV tools, never both: neither fits twice. */
+    private fun toggleSidePanel() {
+        if (uvPanel.visibility == View.VISIBLE) {
+            uvPanel.visibility = View.GONE
+            hierarchyPanel.visibility = View.VISIBLE
+            return
+        }
+        hierarchyPanel.visibility = if (hierarchyPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        if (uvOpen && hierarchyPanel.visibility == View.GONE) {
+            uvPanel.visibility = View.VISIBLE
+        }
+    }
+
+    // --- editor UV -----------------------------------------------------------------------
+
+    private fun openUvEditor() {
+        if (busy || !Native.isAvailable) return
+        if (uvOpen) {
+            uvPanel.visibility = View.VISIBLE
+            hierarchyPanel.visibility = View.GONE
+            return
+        }
+        if (selectedMesh < 0) {
+            report(getString(R.string.status_uv_no_mesh))
+            return
+        }
+        val mesh = selectedMesh
+        val padding = integerField(uvPaddingField, 2)
+        val resolution = integerField(uvResolutionField, 0)
+        beginWork(getString(R.string.status_uv_opening, mesh))
+        Thread {
+            // A mesh imported without UVs has nothing to edit, so the same tap that opens the
+            // editor also generates the layout it is about to show.
+            val opened = Native.nativeUvBegin(mesh)
+            val fromScratch = opened.startsWith("ERROR:")
+            val reply = if (fromScratch) Native.nativeUvGenerate(mesh, padding, resolution) else opened
+            runOnUiThread {
+                if (reply.startsWith("ERROR:")) {
+                    finishWork(
+                        getString(
+                            R.string.status_uv_open_failed,
+                            reply.removePrefix("ERROR:").trim()
+                        )
+                    )
+                    return@runOnUiThread
+                }
+                uvOpen = true
+                uvMesh = mesh
+                hierarchyPanel.visibility = View.GONE
+                uvPanel.visibility = View.VISIBLE
+                viewport.frameAtlas()
+                viewport.setViewMode(VIEW_SPLIT)
+                viewGroup.check(R.id.viewSplit)
+                finishWork(
+                    getString(
+                        if (fromScratch) R.string.status_uv_generated_open else R.string.status_uv_opened,
+                        mesh
+                    )
+                )
+                appendLine(reply.lineSequence().drop(1).filter { it.isNotBlank() }
+                    .joinToString("\n") { "  $it" })
+                renderLog()
+                refreshUvStatus()
+            }
+        }.start()
+    }
+
+    private fun generateUv() {
+        if (busy || !uvOpen || !Native.isAvailable) return
+        val padding = integerField(uvPaddingField, -1)
+        val resolution = integerField(uvResolutionField, -1)
+        if (padding < 1 || padding > 9999 || resolution < 0 || resolution > 8192) {
+            report(getString(R.string.status_uv_bad_number))
+            return
+        }
+        beginWork(getString(R.string.status_uv_generating, padding, resolution))
+        val startedAt = System.currentTimeMillis()
+        Thread {
+            val reply = Native.nativeUvGenerate(uvMesh, padding, resolution)
+            val elapsed = System.currentTimeMillis() - startedAt
+            runOnUiThread {
+                if (reply.startsWith("ERROR:")) {
+                    finishWork(
+                        getString(
+                            R.string.status_uv_generate_failed,
+                            reply.removePrefix("ERROR:").trim()
+                        )
+                    )
+                    return@runOnUiThread
+                }
+                finishWork(getString(R.string.status_uv_generated, elapsed))
+                appendLine(reply.lineSequence().filter { it.isNotBlank() }
+                    .joinToString("\n") { "  $it" })
+                renderLog()
+                viewport.frameAtlas()
+                refreshUvStatus()
+            }
+        }.start()
+    }
+
+    private fun applyUv() {
+        if (busy || !uvOpen || !Native.isAvailable) return
+        beginWork(getString(R.string.status_uv_applying))
+        Thread {
+            val reply = Native.nativeUvApply()
+            runOnUiThread {
+                if (reply.startsWith("ERROR:")) {
+                    finishWork(
+                        getString(
+                            R.string.status_uv_apply_failed,
+                            reply.removePrefix("ERROR:").trim()
+                        )
+                    )
+                    return@runOnUiThread
+                }
+                val mesh = uvMesh
+                closeUvEditor()
+                viewport.refreshScene()
+                finishWork(getString(R.string.status_uv_applied, mesh))
+                refreshHierarchy()
+            }
+        }.start()
+    }
+
+    private fun cancelUv() {
+        if (busy || !uvOpen || !Native.isAvailable) return
+        Native.nativeUvCancel()
+        closeUvEditor()
+        report(getString(R.string.status_uv_cancelled))
+    }
+
+    private fun closeUvEditor() {
+        uvOpen = false
+        uvMesh = -1
+        viewport.additiveSelection = false
+        uvAdditiveCheck.isChecked = false
+        uvPanel.visibility = View.GONE
+        hierarchyPanel.visibility = View.VISIBLE
+        viewport.setViewMode(VIEW_THREE_D)
+        viewGroup.check(R.id.viewThreeD)
+    }
+
+    /** One tool press: run it, say whether it did anything, and show the new state. */
+    private fun uvTool(name: String, action: () -> Boolean) {
+        if (busy || !uvOpen || !Native.isAvailable) return
+        if (!action()) {
+            report(getString(R.string.status_uv_noop, name))
+        }
+        refreshUvStatus()
+        viewport.requestRender()
+    }
+
+    private fun moveIslands(du: Float, dv: Float) {
+        uvTool(getString(R.string.uv_name_move)) { Native.nativeUvTranslate(du, dv) }
+    }
+
+    private fun rotateIslands(degrees: Float) {
+        uvTool(getString(R.string.uv_name_rotate)) { Native.nativeUvRotate(degrees) }
+    }
+
+    private fun scaleIslands(factor: Float) {
+        uvTool(getString(R.string.uv_name_scale)) { Native.nativeUvScale(factor) }
+    }
+
+    private fun repackIslands() {
+        if (busy || !uvOpen) return
+        val padding = integerField(uvPaddingField, 2).coerceAtLeast(1)
+        uvTool(getString(R.string.uv_name_repack)) { Native.nativeUvRepack(padding) }
+    }
+
+    private fun refreshUvStatus() {
+        if (!uvOpen || !Native.isAvailable) return
+        uvStatusText.text = Native.nativeUvStatus().lineSequence()
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+    }
+
+    private fun integerField(field: EditText, fallback: Int): Int =
+        field.text.toString().trim().toIntOrNull() ?: fallback
+
+    override fun onIslandPicked(island: Int, additive: Boolean) {
+        if (!uvOpen) return
+        if (island < 0) {
+            report(getString(R.string.status_uv_pick_miss))
+            refreshUvStatus()
+            return
+        }
+        Native.nativeUvSelect(island, additive)
+        report(
+            getString(
+                if (additive) R.string.status_uv_pick_add else R.string.status_uv_pick,
+                island
+            )
+        )
+        refreshUvStatus()
+        viewport.requestRender()
     }
 
     // --- import --------------------------------------------------------------------------
@@ -168,6 +443,11 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
             runOnUiThread {
                 if (imported) {
+                    // The scene was rebuilt, so an open session would apply to the wrong mesh.
+                    if (uvOpen) {
+                        Native.nativeUvCancel()
+                        closeUvEditor()
+                    }
                     selectedMesh = -1
                     viewport.refreshScene()
                     viewport.frameScene()
@@ -341,5 +621,13 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         const val MAX_MODEL_BYTES = 96L * MEGABYTE
         const val STREAM_CHUNK = 64 * 1024
         const val LOG_LIMIT = 8000
+
+        // Renderer view modes, mirrored in g3d_renderer.hpp.
+        const val VIEW_THREE_D = 0
+        const val VIEW_SPLIT = 1
+        const val VIEW_ATLAS = 2
+
+        // A button press moves the selection by this much of the atlas; dragging is the fine tool.
+        const val MOVE_STEP = 0.05f
     }
 }

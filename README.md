@@ -3,9 +3,12 @@
 Editor 3D para Android com foco em UV unwrapping (xatlas), edição de ilhas UV e composição de
 texturas por camadas. Veja o [PLAN.md](PLAN.md) para objetivos, escopo e fases.
 
-**Estado:** Fase 2 concluída — importação de OBJ/glTF/GLB (Assimp), cena com múltiplas malhas,
-renderizador OpenGL ES 3.0 e seleção de malhas por toque. Editor UV, compositor de texturas,
-salvamento de projeto e exportação ainda não existem.
+**Estado:** Fase 3 implementada — geração de UVs com xatlas, sessão de edição com pré-visualização
+(selecionar ilhas, mover, girar, escalar, ajustar ao atlas, reempacotar), vista 2D do atlas no
+renderizador OpenGL ES 3.0 e aplicar/cancelar com relatório de validação. O comportamento do núcleo
+é comprovado pelos testes no host (`bash native/tests/run_host_test.sh`); a tela do editor UV ainda
+não foi validada em telefone. Compositor de texturas, salvamento de projeto e exportação ainda não
+existem.
 
 ## Compilar
 

@@ -50,6 +50,30 @@ bool closeTo(float value, float expected, float tolerance = 1e-4f) {
     return std::fabs(value - expected) < tolerance;
 }
 
+// UV bounds of one island recomputed from the layout snapshot the renderer consumes, so the
+// bookkeeping inside that snapshot is never taken on trust either.
+void islandBoundsFromLayout(g3d::UvEditor &editor, g3d::UvLayout &layout, uint32_t island,
+                            float out[4]) {
+    out[0] = out[1] = std::numeric_limits<float>::max();
+    out[2] = out[3] = std::numeric_limits<float>::lowest();
+    if (!editor.layout(layout)) {
+        return;
+    }
+    for (size_t triangle = 0; triangle * 3 + 2 < layout.indices.size(); ++triangle) {
+        if (triangle >= layout.faceIsland.size() || layout.faceIsland[triangle] != island) {
+            continue;
+        }
+        for (uint32_t corner = 0; corner < 3; ++corner) {
+            const uint32_t vertex = layout.indices[triangle * 3 + corner];
+            for (uint32_t axis = 0; axis < 2; ++axis) {
+                const float value = layout.uvs[vertex * 2 + axis];
+                out[axis] = std::min(out[axis], value);
+                out[axis + 2] = std::max(out[axis + 2], value);
+            }
+        }
+    }
+}
+
 // UV bounds of one island, read straight off the vertex data so the test never trusts the
 // bookkeeping it is checking.
 void islandBounds(const g3d::Mesh &mesh, const g3d::UvIslands &islands, uint32_t island,
@@ -329,8 +353,39 @@ int main() {
     std::vector<float> uvsCommitted = uvsAfterApply;
     check(editor.begin(1, editorError), "reabrir a malha aplicada: " + editorError);
     check(editor.select(0, false) && editor.translate(-0.2f, 0.0f), "editar de novo");
+
+    // The interface rotates and scales around the centre of the selection, so that centre has to
+    // exist while something is selected and disappear with the selection.
+    float selectionCentre[2] = {-2.0f, -2.0f};
+    check(editor.selectionPivot(selectionCentre), "a selecao tem um centro para girar e escalar");
+    check(selectionCentre[0] >= -1.0f && selectionCentre[0] <= 2.0f &&
+              selectionCentre[1] >= -1.0f && selectionCentre[1] <= 2.0f,
+          "o centro da selecao cai perto do atlas");
+    editor.clearSelection();
+    check(!editor.selectionPivot(selectionCentre), "sem selecao nao ha centro");
+    check(editor.select(0, false), "repor a selecao");
+
+    // Exactly what the rotate button does: the pivot comes from the selection itself, and a
+    // quarter turn about it swaps the island's width and height.
+    float boxBefore[4];
+    islandBoundsFromLayout(editor, snapshot, 0, boxBefore);
+    check(editor.rotate(static_cast<float>(M_PI) * 0.5f, selectionCentre[0], selectionCentre[1]),
+          "girar a selecao em torno do proprio centro");
+    float boxAfter[4];
+    islandBoundsFromLayout(editor, snapshot, 0, boxAfter);
+    const float widthBefore = boxBefore[2] - boxBefore[0];
+    const float heightBefore = boxBefore[3] - boxBefore[1];
+    check(std::fabs((boxAfter[2] - boxAfter[0]) - heightBefore) < 1e-3f &&
+              std::fabs((boxAfter[3] - boxAfter[1]) - widthBefore) < 1e-3f,
+          "girar troca a largura pela altura da ilha");
+    check(editor.scale(0.5f, selectionCentre[0], selectionCentre[1]), "escalar a selecao");
+    islandBoundsFromLayout(editor, snapshot, 0, boxAfter);
+    check(std::fabs((boxAfter[2] - boxAfter[0]) - heightBefore * 0.5f) < 1e-3f,
+          "escalar reduz a ilha pela metade");
+
     editor.cancel();
     check(!editor.isActive(), "cancelar fecha a sessao");
+    check(!editor.selectionPivot(selectionCentre), "com a sessao fechada nao ha centro");
     std::vector<float> uvsAfterCancel;
     document.withScene([&uvsAfterCancel](g3d::Scene &scene) { uvsAfterCancel = scene.meshAt(1)->uvs; });
     check(uvsAfterCancel == uvsCommitted, "cancelar devolve a cena ao estado aplicado");

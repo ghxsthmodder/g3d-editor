@@ -46,4 +46,48 @@ object Native {
     external fun nativeRenderPick(x: Float, y: Float): Int
 
     external fun nativeRenderSetShading(mode: Int)
+
+    // --- editor UV ---
+    // Each call is one whole operation on the native session. Only nativeUvGenerate is slow enough
+    // to need a background thread.
+
+    external fun nativeUvBegin(meshIndex: Int): String
+
+    external fun nativeUvGenerate(meshIndex: Int, padding: Int, resolution: Int): String
+
+    external fun nativeUvApply(): String
+
+    external fun nativeUvCancel()
+
+    external fun nativeUvStatus(): String
+
+    external fun nativeUvSelect(island: Int, additive: Boolean): Boolean
+
+    external fun nativeUvSelectAll()
+
+    external fun nativeUvClearSelection()
+
+    external fun nativeUvTranslate(du: Float, dv: Float): Boolean
+
+    external fun nativeUvRotate(degrees: Float): Boolean
+
+    external fun nativeUvScale(factor: Float): Boolean
+
+    external fun nativeUvFit(): Boolean
+
+    external fun nativeUvRepack(padding: Int): Boolean
+
+    // --- vista e atlas ---
+
+    external fun nativeViewSetMode(mode: Int)
+
+    external fun nativeUvPan(dx: Float, dy: Float)
+
+    external fun nativeUvZoom(factor: Float)
+
+    external fun nativeUvFrame()
+
+    external fun nativeUvAt(x: Float, y: Float, out: FloatArray): Boolean
+
+    external fun nativeUvPick(x: Float, y: Float): Int
 }

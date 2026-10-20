@@ -10,7 +10,9 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * 3D viewport. One finger orbits, two fingers pan, pinch zooms, a tap selects a mesh.
+ * 3D viewport, and the atlas panel the renderer draws next to it. One finger orbits the model or
+ * drags the atlas, two fingers pan, pinch zooms, a tap selects a mesh or a UV island. Which of the
+ * two a gesture belongs to is decided by where it started, asked from the native side.
  * Every call that touches GL or the native camera is posted to the GL thread with queueEvent.
  */
 class ModelView @JvmOverloads constructor(
@@ -20,9 +22,13 @@ class ModelView @JvmOverloads constructor(
 
     interface Listener {
         fun onMeshPicked(index: Int)
+        fun onIslandPicked(island: Int, additive: Boolean)
     }
 
     var listener: Listener? = null
+
+    /** When set, a tap on the atlas adds to the selection instead of replacing it. */
+    var additiveSelection = false
 
     private var lastX = 0f
     private var lastY = 0f
@@ -30,6 +36,9 @@ class ModelView @JvmOverloads constructor(
     private var lastMidX = 0f
     private var lastMidY = 0f
     private var dragDistance = 0f
+    private var gestureOnAtlas = false
+
+    private val uvPoint = FloatArray(2)
 
     private val tapSlopPx: Float = 12f
 
@@ -85,6 +94,19 @@ class ModelView @JvmOverloads constructor(
         }
     }
 
+    /** 0 = only 3D, 1 = 3D + atlas, 2 = only atlas. None of these touch GL, so the UI thread is fine. */
+    fun setViewMode(mode: Int) {
+        if (!Native.isAvailable) return
+        Native.nativeViewSetMode(mode)
+        requestRender()
+    }
+
+    fun frameAtlas() {
+        if (!Native.isAvailable) return
+        Native.nativeUvFrame()
+        requestRender()
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!Native.isAvailable) return false
 
@@ -93,6 +115,7 @@ class ModelView @JvmOverloads constructor(
                 lastX = event.x
                 lastY = event.y
                 dragDistance = 0f
+                gestureOnAtlas = Native.nativeUvAt(event.x, event.y, uvPoint)
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> {
@@ -111,11 +134,16 @@ class ModelView @JvmOverloads constructor(
                     lastY = event.y
                     dragDistance += abs(dx) + abs(dy)
                     if (dragDistance > tapSlopPx) {
-                        // The render request is queued behind the gesture so the frame always shows
-                        // the new camera instead of the previous one.
-                        queueEvent {
-                            Native.nativeRenderOrbit(dx, dy)
+                        if (gestureOnAtlas) {
+                            Native.nativeUvPan(dx, dy)
                             requestRender()
+                        } else {
+                            // The render request is queued behind the gesture so the frame always shows
+                            // the new camera instead of the previous one.
+                            queueEvent {
+                                Native.nativeRenderOrbit(dx, dy)
+                                requestRender()
+                            }
                         }
                     }
                 } else {
@@ -127,10 +155,16 @@ class ModelView @JvmOverloads constructor(
                     lastMidY = mid[1]
                     val pinch = if (lastPinchDistance > 0f && distance > 0f) lastPinchDistance / distance else 0f
                     lastPinchDistance = distance
-                    queueEvent {
-                        if (pinch > 0f) Native.nativeRenderZoom(pinch)
-                        Native.nativeRenderPan(panX, panY)
+                    if (gestureOnAtlas) {
+                        if (pinch > 0f) Native.nativeUvZoom(pinch)
+                        Native.nativeUvPan(panX, panY)
                         requestRender()
+                    } else {
+                        queueEvent {
+                            if (pinch > 0f) Native.nativeRenderZoom(pinch)
+                            Native.nativeRenderPan(panX, panY)
+                            requestRender()
+                        }
                     }
                 }
             }
@@ -146,9 +180,16 @@ class ModelView @JvmOverloads constructor(
                 if (dragDistance <= tapSlopPx) {
                     val x = event.x
                     val y = event.y
-                    queueEvent {
-                        val hit = Native.nativeRenderPick(x, y)
-                        post { listener?.onMeshPicked(hit) }
+                    if (gestureOnAtlas) {
+                        // Picking an island reads the session, not GL, so the answer is immediate.
+                        val island = Native.nativeUvPick(x, y)
+                        val additive = additiveSelection
+                        post { listener?.onIslandPicked(island, additive) }
+                    } else {
+                        queueEvent {
+                            val hit = Native.nativeRenderPick(x, y)
+                            post { listener?.onMeshPicked(hit) }
+                        }
                     }
                 }
                 dragDistance = 0f

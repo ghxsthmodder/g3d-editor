@@ -48,19 +48,23 @@ não é necessário.
 bash native/tests/run_host_test.sh
 ```
 
-O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os três testes via
+O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os cinco testes via
 CTest (nenhum deles faz parte do APK):
 
-| Teste | O que verifica |
-| --- | --- |
-| `host_smoke_test` | geração de UV com xatlas a partir de geometria sintética |
-| `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento |
-| `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer |
+| Teste | Executável | O que verifica |
+| --- | --- | --- |
+| `uv_smoke_test` | `host_smoke_test` | geração de UV com xatlas a partir de geometria sintética |
+| `import_test` | `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento |
+| `uv_islands_test` | `host_uv_test` | agrupamento de UVs em ilhas e conectividade |
+| `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, validar, aplicar/cancelar |
+| `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer, incluindo a vista 2D do atlas |
 
-`host_render_test` só é construído quando o host tem EGL + OpenGL ES 3 (`libegl-dev`,
+`render_test` só é construído quando o host tem EGL + OpenGL ES 3 (`libegl-dev`,
 `libgles-dev`/Mesa). Ele usa a plataforma *surfaceless* do Mesa e, quando não há contexto
 disponível, imprime `SKIP` e sai com sucesso. Com `G3D_RENDER_PREVIEW=/tmp/look` ele também grava
-`/tmp/look.solido.ppm`, `.normais.ppm` e `.selecao.ppm`, para inspecionar a imagem sem telefone.
+PPM para inspecionar a imagem sem telefone: `look.solido.ppm`, `look.normais.ppm`,
+`look.selecao.ppm`, `look.atlas.ppm` (sobreposições em vermelho), `look.ilha.ppm` (ilha selecionada
+em âmbar), `look.repack.ppm`, `look.so_atlas.ppm` e `look.vazio.ppm`.
 
 ## Estrutura
 

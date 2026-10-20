@@ -47,6 +47,9 @@ public:
     bool scale(float factor, float pivotU, float pivotV);
     bool fit();
     bool repack(uint32_t paddingTexels);
+    // Centre of the selection's UV box. A rotate or scale needs a pivot, and the interface has no
+    // way to know where the selection is without it. False when nothing is selected.
+    bool selectionPivot(float out[2]);
 
     // Validation and state as text for the status log.
     std::string report();

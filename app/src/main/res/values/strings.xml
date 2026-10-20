@@ -1,16 +1,80 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">G3D Editor</string>
-    <string name="phase_2_subtitle">Fase 2: importação e visualização 3D</string>
+    <string name="phase_3_subtitle">Fase 3: geração e edição de UVs</string>
 
     <string name="import_model">Importar modelo</string>
     <string name="frame_scene">Reenquadrar</string>
     <string name="shading_solid">Sólido</string>
     <string name="shading_normals">Normais</string>
+    <string name="view_split">3D + UV</string>
+    <string name="view_three_d">Somente 3D</string>
+    <string name="view_atlas">Somente UV</string>
+    <string name="open_uv_editor">Editor UV</string>
     <string name="toggle_panel">Painel</string>
     <string name="hierarchy_title">Hierarquia</string>
-    <string name="viewport_hint">1 dedo: orbitar · 2 dedos: mover · pinça: zoom · toque: selecionar</string>
+    <string name="viewport_hint">3D: 1 dedo orbita, 2 dedos movem, pinça aproxima, toque seleciona · atlas: arrasta, pinça, toque escolhe a ilha</string>
     <string name="menu_native_diagnostic">Diagnóstico de UV (fase 1)</string>
+
+    <string name="uv_title">Editor UV</string>
+    <string name="uv_generate_title">Geração</string>
+    <string name="uv_generate_fields">margem em texels · resolução do atlas</string>
+    <string name="uv_padding_hint">margem</string>
+    <string name="uv_padding_default">2</string>
+    <string name="uv_resolution_hint">resolução</string>
+    <string name="uv_resolution_default">1024</string>
+    <string name="uv_generate">Gerar e pré-visualizar</string>
+    <string name="uv_selection_title">Seleção</string>
+    <string name="uv_select_all">Tudo</string>
+    <string name="uv_select_none">Nada</string>
+    <string name="uv_additive">Somar ao tocar</string>
+    <string name="uv_translate_title">Mover ilhas</string>
+    <string name="uv_move_step">cada toque desloca 5 % do atlas</string>
+    <string name="uv_move_left">←</string>
+    <string name="uv_move_right">→</string>
+    <string name="uv_move_down">↓</string>
+    <string name="uv_move_up">↑</string>
+    <string name="uv_rotate_title">Girar</string>
+    <string name="uv_rotate_minus_90">-90°</string>
+    <string name="uv_rotate_minus_15">-15°</string>
+    <string name="uv_rotate_plus_15">+15°</string>
+    <string name="uv_rotate_plus_90">+90°</string>
+    <string name="uv_transform_title">Escala e arranjo</string>
+    <string name="uv_scale_down">0,8×</string>
+    <string name="uv_scale_up">1,25×</string>
+    <string name="uv_fit">Ajustar</string>
+    <string name="uv_repack">Reempacotar</string>
+    <string name="uv_frame_atlas">Reenquadrar UV</string>
+    <string name="uv_apply">Aplicar</string>
+    <string name="uv_cancel">Cancelar</string>
+
+    <string name="uv_name_move">mover</string>
+    <string name="uv_name_rotate">girar</string>
+    <string name="uv_name_scale">escalar</string>
+    <string name="uv_name_fit">ajustar ao atlas</string>
+    <string name="uv_name_repack">reempacotar</string>
+    <string name="uv_name_select_all">selecionar tudo</string>
+    <string name="uv_name_select_none">limpar a seleção</string>
+
+    <string name="status_uv_no_mesh">nenhuma malha selecionada — toque no modelo ou escolha uma na hierarquia antes de abrir o editor UV</string>
+    <string name="status_uv_opening">abrindo o editor UV na malha %1$d …</string>
+    <string name="status_uv_opened">editor UV aberto na malha %1$d com os UVs do arquivo</string>
+    <string name="status_uv_generated_open">a malha não tinha UVs: gerados para editar, malha %1$d</string>
+    <string name="status_uv_open_failed">não foi possível abrir o editor UV: %1$s</string>
+    <string name="status_uv_generating">gerando UVs (margem %1$d texels, resolução %2$d px) …</string>
+    <string name="status_uv_generated">pré-visualização pronta em %1$d ms</string>
+    <string name="status_uv_generate_failed">a geração de UV falhou: %1$s</string>
+    <string name="status_uv_applying">aplicando os UVs à malha …</string>
+    <string name="status_uv_applied">UVs aplicados à malha %1$d</string>
+    <string name="status_uv_apply_failed">não foi possível aplicar: %1$s</string>
+    <string name="status_uv_cancelled">edição cancelada: os UVs da malha não mudaram</string>
+    <string name="status_uv_noop">%1$s não fez nada: selecione uma ilha no atlas primeiro</string>
+    <string name="status_uv_pick">ilha %1$d selecionada</string>
+    <string name="status_uv_pick_add">ilha %1$d somada à seleção</string>
+    <string name="status_uv_pick_miss">toque não encontrou nenhuma ilha</string>
+    <string name="status_uv_additive_on">toque soma ilhas à seleção</string>
+    <string name="status_uv_additive_off">toque substitui a seleção</string>
+    <string name="status_uv_bad_number">margem entre 1 e 9999 texels; resolução 0 (automática) ou entre 1 e 8192</string>
 
     <string name="status_native_missing">Biblioteca nativa não carregada: %1$s</string>
     <string name="status_importing">importando %1$s …</string>

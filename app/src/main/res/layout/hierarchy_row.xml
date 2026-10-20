@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground">
+
+    <!-- Behind the labels: a foreground on the row would paint over its own text. -->
+    <View
+        android:id="@+id/rowHighlight"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/hierarchy_selected"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="8dp"
+        android:paddingTop="7dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="7dp">
+
+        <TextView
+            android:id="@+id/rowName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="middle"
+            android:singleLine="true"
+            android:textColor="@color/editor_text"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/rowStats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/editor_text_dim"
+            android:textSize="11sp" />
+    </LinearLayout>
+</FrameLayout>

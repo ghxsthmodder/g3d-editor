@@ -3,4 +3,8 @@
     <color name="editor_background">#0F1115</color>
     <color name="editor_panel">#16191F</color>
     <color name="editor_text">#D6DEE8</color>
+    <color name="editor_text_dim">#8E9AAC</color>
+    <color name="overlay_background">#B30F1115</color>
+    <color name="hierarchy_selected">#22303F</color>
+    <color name="selection_accent">#F8B838</color>
 </resources>

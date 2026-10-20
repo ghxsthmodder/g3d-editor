@@ -16,10 +16,24 @@ licença e os arquivos mantidos.
 
 ## Assimp
 
-- Finalidade planejada: importação/exportação de OBJ, glTF e GLB.
-- **Ainda não incorporado.** Será adicionado na Fase 2, com a configuração de build restrita aos
-  formatos necessários.
-- Repositório: https://github.com/assimp/assimp — licença ISC (compatível com MIT/BSD).
+- Finalidade: importação de OBJ, glTF e GLB.
+- Repositório: https://github.com/assimp/assimp
+- Versão: tag `v6.0.5`, commit `392a658f9c271be965271f45e7521a1b80ea4392`.
+- Licença: ISC (arquivo `LICENSE`), que cobre também os subcomponentes em `contrib/`.
+- Arquivos mantidos: `CMakeLists.txt`, `assimp.pc.in`, `code/`, `include/`, `cmake-modules/` e os
+  diretórios de `contrib/` exigidos pelo build (`zlib`, `zip`, `unzip`, `rapidjson`, `pugixml`,
+  `utf8cpp`, `stb`, `poly2tri`, `earcut-hpp`, `clipper`, `openddlparser`, `Open3DGC`, `meshlab`).
+  `test/` (211 MB de modelos), `tools/`, `doc/`, `samples/`, `port/`, `draco`, `googletest`,
+  `tinyusdz` e `android-cmake` foram removidos.
+- Configuração de build (definida em `native/CMakeLists.txt`, com `FORCE`):
+  - `ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=OFF`, apenas `OBJ` e `GLTF` habilitados;
+  - `ASSIMP_NO_EXPORT=ON` — a exportação será reavaliada na Fase 5;
+  - `BUILD_SHARED_LIBS=OFF` (liga estática dentro de `libg3dnative.so`);
+  - `ASSIMP_BUILD_TESTS=OFF`, `ASSIMP_BUILD_ASSIMP_TOOLS=OFF`;
+  - `ASSIMP_INJECT_DEBUG_POSTFIX=OFF`: sem isso o Assimp define `CMAKE_DEBUG_POSTFIX "d"` no mesmo
+    build tree e a biblioteca passaria a `libg3dnatived.so`, quebrando `System.loadLibrary`.
+- Tamanho adicionado: `libg3dnative.so` (núcleo + xatlas + Assimp) fica em ~3,8 MB por ABI em
+  Debug e ~2,2 MB em Release.
 
 ## stb
 
@@ -41,7 +55,8 @@ licença e os arquivos mantidos.
 - Licença: MIT (ver `glm/copying.txt`).
 - Arquivos mantidos: cabeçalhos em `glm/`, `copying.txt`, `readme.md`. Testes, documentação e o
   próprio `CMakeLists.txt` da biblioteca foram removidos; GLM é header-only.
-- Uso atual: `native/core/primitives.cpp` (bounding box e construção do cubo).
+- Uso atual: `native/importers/assimp_importer.cpp` (transformações de nó e normais) e
+  `native/renderer/g3d_renderer.cpp` (câmera, matrizes de projeção e picking por raio).
 
 ## Material Components for Android
 

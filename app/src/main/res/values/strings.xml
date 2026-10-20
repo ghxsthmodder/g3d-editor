@@ -1,6 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">G3D Editor</string>
-    <string name="run_smoke_test">Gerar UVs do cubo de teste</string>
-    <string name="phase_1_subtitle">Fase 1: núcleo nativo e xatlas</string>
+    <string name="phase_2_subtitle">Fase 2: importação e visualização 3D</string>
+
+    <string name="import_model">Importar modelo</string>
+    <string name="frame_scene">Reenquadrar</string>
+    <string name="shading_solid">Sólido</string>
+    <string name="shading_normals">Normais</string>
+    <string name="toggle_panel">Painel</string>
+    <string name="hierarchy_title">Hierarquia</string>
+    <string name="viewport_hint">1 dedo: orbitar · 2 dedos: mover · pinça: zoom · toque: selecionar</string>
+    <string name="menu_native_diagnostic">Diagnóstico de UV (fase 1)</string>
+
+    <string name="status_native_missing">Biblioteca nativa não carregada: %1$s</string>
+    <string name="status_importing">importando %1$s …</string>
+    <string name="status_import_failed">falha ao importar %1$s: %2$s</string>
+    <string name="status_import_done">importado em %1$d ms: %2$s</string>
+    <string name="status_unsupported_extension">formato .%1$s não suportado nesta versão (use .obj, .gltf ou .glb)</string>
+    <string name="status_pick_miss">toque não encontrou nenhuma malha</string>
+    <string name="status_file_too_large">arquivo grande demais: %1$d MB (limite %2$d MB)</string>
+    <string name="status_file_empty">o arquivo escolhido está vazio</string>
+    <string name="status_read_error">não foi possível ler o arquivo: %1$s</string>
+    <string name="status_no_selection">nenhuma malha selecionada</string>
+    <string name="hierarchy_none">nenhuma malha no documento</string>
+    <string name="uv_report_title">geração de UV do cubo de teste:</string>
 </resources>

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "core/material.hpp"
+
 namespace g3d {
 
 // Common internal representation of a mesh, independent of the file format it came from.
@@ -11,6 +13,7 @@ namespace g3d {
 // Indices are a triangle list.
 struct Mesh {
     std::string name;
+    Material material;
     std::vector<float> positions;
     std::vector<float> normals;  // optional: empty when the source has none
     std::vector<float> uvs;      // optional: empty until UVs are generated or imported

@@ -38,16 +38,29 @@ Outros comandos úteis:
 ./gradlew clean
 ```
 
-## Testar o núcleo nativo sem dispositivo
+Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembleDebug`): as
+dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
+não é necessário.
 
-O núcleo C++ (malha, primitivas e serviço de UV sobre xatlas) compila e roda em Linux host:
+## Testar o núcleo nativo sem dispositivo
 
 ```bash
 bash native/tests/run_host_test.sh
 ```
 
-Isso constrói `native/tests/build-host/host_smoke_test` com o `g++` do sistema e executa as
-verificações de geração de UV. O script não faz parte do APK.
+O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os três testes via
+CTest (nenhum deles faz parte do APK):
+
+| Teste | O que verifica |
+| --- | --- |
+| `host_smoke_test` | geração de UV com xatlas a partir de geometria sintética |
+| `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento |
+| `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer |
+
+`host_render_test` só é construído quando o host tem EGL + OpenGL ES 3 (`libegl-dev`,
+`libgles-dev`/Mesa). Ele usa a plataforma *surfaceless* do Mesa e, quando não há contexto
+disponível, imprime `SKIP` e sai com sucesso. Com `G3D_RENDER_PREVIEW=/tmp/look` ele também grava
+`/tmp/look.solido.ppm`, `.normais.ppm` e `.selecao.ppm`, para inspecionar a imagem sem telefone.
 
 ## Estrutura
 

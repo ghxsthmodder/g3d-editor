@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">G3D Editor</string>
+    <string name="run_smoke_test">Gerar UVs do cubo de teste</string>
+    <string name="phase_1_subtitle">Fase 1: núcleo nativo e xatlas</string>
+</resources>

@@ -1,0 +1,23 @@
+# Build
+.gradle/
+build/
+*/build/
+.cxx/
+app/.cxx/
+native/tests/build-host/
+*.o
+*.so
+
+# Local SDK/NDK paths
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Captures
+*.logcat
+
+# Design assets entregues separadamente do build
+app/appIcon.zip

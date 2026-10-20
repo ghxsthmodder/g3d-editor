@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.G3DEditor" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">@color/editor_background</item>
+        <item name="android:statusBarColor">@color/editor_background</item>
+        <item name="android:navigationBarColor">@color/editor_background</item>
+        <item name="android:textColorPrimary">@color/editor_text</item>
+    </style>
+</resources>

@@ -33,6 +33,7 @@ set(G3D_CORE_SOURCES
     core/document.cpp
     core/uv_islands.cpp
     texture/g3d_image.cpp
+    texture/texture_layer.cpp
     ${G3D_STB_IMPL}
     importers/assimp_importer.cpp
     uv/uv_service.cpp
@@ -102,6 +103,10 @@ else()
     target_compile_definitions(host_image_test
         PRIVATE G3D_TEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/models")
     add_test(NAME image_test COMMAND host_image_test)
+
+    add_executable(host_compose_test tests/host_compose_test.cpp)
+    target_link_libraries(host_compose_test PRIVATE g3dcore)
+    add_test(NAME compose_test COMMAND host_compose_test)
 
     # Headless GL test of the renderer. Only built when the host has EGL and OpenGL ES 3.
     find_library(G3D_EGL_LIBRARY EGL)

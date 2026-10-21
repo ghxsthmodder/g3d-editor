@@ -48,7 +48,7 @@ não é necessário.
 bash native/tests/run_host_test.sh
 ```
 
-O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os seis testes via
+O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os sete testes via
 CTest (nenhum deles faz parte do APK):
 
 | Teste | Executável | O que verifica |
@@ -57,6 +57,7 @@ CTest (nenhum deles faz parte do APK):
 | `import_test` | `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento |
 | `uv_islands_test` | `host_uv_test` | agrupamento de UVs em ilhas e conectividade |
 | `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, validar, aplicar/cancelar |
+| `compose_test` | `host_compose_test` | pilha de camadas: fundo, mover, girar, escalar, opacidade, visibilidade, ordem, duplicar, remover, orçamento de memória e o PNG resultante |
 | `image_test` | `host_image_test` | decodificação PNG/JPEG (stb), ida e volta sem perdas do PNG, paleta com transparência, limite de pixels e quadriculado de referência |
 | `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer, incluindo a vista 2D do atlas |
 

@@ -90,4 +90,40 @@ object Native {
     external fun nativeUvAt(x: Float, y: Float, out: FloatArray): Boolean
 
     external fun nativeUvPick(x: Float, y: Float): Int
+
+    external fun nativeSetUvOverlay(visible: Boolean)
+
+    // --- compositor de texturas ---
+    // The stack lives in native code and guards itself, so these are safe from the UI thread.
+    // Importing and exporting are the two that can take long enough to need a background thread.
+
+    external fun nativeTextureImportImage(data: ByteArray, fileNameHint: String): String
+
+    external fun nativeTextureInfo(): String
+
+    external fun nativeTextureHasCanvas(): Boolean
+
+    external fun nativeTextureSetCanvas(width: Int, height: Int): String
+
+    external fun nativeTextureSetBackground(rgb: Int)
+
+    external fun nativeTextureRemove(id: Int): Boolean
+
+    external fun nativeTextureDuplicate(id: Int): String
+
+    external fun nativeTextureMoveUp(id: Int): Boolean
+
+    external fun nativeTextureMoveDown(id: Int): Boolean
+
+    external fun nativeTextureSetVisible(id: Int, visible: Boolean): Boolean
+
+    external fun nativeTextureSetOpacity(id: Int, opacity: Float): Boolean
+
+    external fun nativeTextureTranslate(id: Int, dxPixels: Float, dyPixels: Float): Boolean
+
+    external fun nativeTextureRotate(id: Int, degrees: Float): Boolean
+
+    external fun nativeTextureScale(id: Int, factor: Float): Boolean
+
+    external fun nativeTexturePng(): ByteArray?
 }

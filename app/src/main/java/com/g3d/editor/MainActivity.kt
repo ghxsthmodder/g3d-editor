@@ -11,6 +11,7 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -22,9 +23,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Editor screen. Phase 2 brought the import and the 3D preview; phase 3 adds the UV workspace:
- * a session that previews xatlas results, the atlas the renderer draws next to the model, and the
- * island tools that edit it before anything reaches the scene.
+ * Editor screen. Phase 2 brought the import and the 3D preview, phase 3 the UV workspace, and
+ * phase 4 the texture compositor: a stack of imported images that the renderer shows on the model
+ * and in the atlas, and that exports as the PNG the same code composes.
  */
 class MainActivity : AppCompatActivity(), ModelView.Listener {
 
@@ -41,6 +42,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private var uvOpen = false
     private var uvMesh = -1
     private var logVisible = true
+    private var selectedLayer = -1
 
     private lateinit var viewport: ModelView
     private lateinit var hierarchyPanel: View
@@ -58,10 +60,33 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var uvPaddingField: EditText
     private lateinit var uvResolutionField: EditText
     private lateinit var uvAdditiveCheck: CheckBox
+    private lateinit var texturePanel: View
+    private lateinit var textureList: LinearLayout
+    private lateinit var textureSummary: TextView
+    private lateinit var textureCanvasField: EditText
+    private lateinit var textureBackgroundField: EditText
+    private lateinit var textureVisibleCheck: CheckBox
+    private lateinit var textureOpacityBar: SeekBar
+    private lateinit var textureOpacityLabel: TextView
+    private lateinit var textureLinesCheck: CheckBox
+
+    private val textureRows = mutableListOf<Pair<Int, View>>()
+    private val textureStats = mutableMapOf<Int, String>()
 
     private val openModel =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
             if (uri != null) importUri(uri)
+        }
+
+    private val openImage =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+            if (uri != null) importTextureImage(uri)
+        }
+
+    private val createPng =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri: Uri? ->
+            if (uri != null) writeTexturePng(uri)
+            else report(getString(R.string.status_texture_export_cancelled))
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,6 +110,15 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         uvPaddingField = findViewById(R.id.uvPadding)
         uvResolutionField = findViewById(R.id.uvResolution)
         uvAdditiveCheck = findViewById(R.id.uvAdditive)
+        texturePanel = findViewById(R.id.texturePanel)
+        textureList = findViewById(R.id.textureList)
+        textureSummary = findViewById(R.id.textureSummary)
+        textureCanvasField = findViewById(R.id.textureCanvas)
+        textureBackgroundField = findViewById(R.id.textureBackground)
+        textureVisibleCheck = findViewById(R.id.textureVisible)
+        textureOpacityBar = findViewById(R.id.textureOpacity)
+        textureOpacityLabel = findViewById(R.id.textureOpacityLabel)
+        textureLinesCheck = findViewById(R.id.textureUvLines)
 
         viewport.listener = this
         importButton.setOnClickListener { openModel.launch(arrayOf("*/*")) }
@@ -98,7 +132,14 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         shadingGroup.check(R.id.shadingSolid)
         shadingGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
-                viewport.setShading(if (checkedId == R.id.shadingNormals) 1 else 0)
+                viewport.setShading(
+                    when (checkedId) {
+                        R.id.shadingNormals -> SHADING_NORMALS
+                        R.id.shadingTexture -> SHADING_TEXTURED
+                        R.id.shadingChecker -> SHADING_CHECKER
+                        else -> SHADING_SOLID
+                    }
+                )
             }
         }
         viewGroup.check(R.id.viewThreeD)
@@ -158,6 +199,51 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         }
         findViewById<View>(R.id.uvApply).setOnClickListener { applyUv() }
         findViewById<View>(R.id.uvCancel).setOnClickListener { cancelUv() }
+        findViewById<View>(R.id.openTexture).setOnClickListener { openTexturePanel() }
+        findViewById<View>(R.id.textureImportImage).setOnClickListener { startImageImport() }
+        findViewById<View>(R.id.textureSetCanvas).setOnClickListener { applyTextureCanvas() }
+        findViewById<View>(R.id.textureSetBackground).setOnClickListener { applyTextureBackground() }
+        findViewById<View>(R.id.textureExport).setOnClickListener { exportTexture() }
+        findViewById<View>(R.id.textureDuplicate).setOnClickListener { duplicateLayer() }
+        findViewById<View>(R.id.textureRemove).setOnClickListener {
+            textureTool(getString(R.string.texture_name_remove)) { Native.nativeTextureRemove(selectedLayer) }
+        }
+        findViewById<View>(R.id.textureMoveUpStack).setOnClickListener {
+            textureTool(getString(R.string.texture_name_order_up)) { Native.nativeTextureMoveUp(selectedLayer) }
+        }
+        findViewById<View>(R.id.textureMoveDownStack).setOnClickListener {
+            textureTool(getString(R.string.texture_name_order_down)) {
+                Native.nativeTextureMoveDown(selectedLayer)
+            }
+        }
+        findViewById<View>(R.id.textureUp).setOnClickListener { nudgeLayer(0.0f, -TEXTURE_MOVE_STEP) }
+        findViewById<View>(R.id.textureDown).setOnClickListener { nudgeLayer(0.0f, TEXTURE_MOVE_STEP) }
+        findViewById<View>(R.id.textureLeft).setOnClickListener { nudgeLayer(-TEXTURE_MOVE_STEP, 0.0f) }
+        findViewById<View>(R.id.textureRight).setOnClickListener { nudgeLayer(TEXTURE_MOVE_STEP, 0.0f) }
+        findViewById<View>(R.id.textureRotateMinus90).setOnClickListener { rotateLayer(-90.0f) }
+        findViewById<View>(R.id.textureRotateMinus15).setOnClickListener { rotateLayer(-15.0f) }
+        findViewById<View>(R.id.textureRotatePlus15).setOnClickListener { rotateLayer(15.0f) }
+        findViewById<View>(R.id.textureRotatePlus90).setOnClickListener { rotateLayer(90.0f) }
+        findViewById<View>(R.id.textureScaleDown).setOnClickListener {
+            textureTool(getString(R.string.texture_name_scale)) {
+                Native.nativeTextureScale(selectedLayer, 0.8f)
+            }
+        }
+        findViewById<View>(R.id.textureScaleUp).setOnClickListener {
+            textureTool(getString(R.string.texture_name_scale)) {
+                Native.nativeTextureScale(selectedLayer, 1.25f)
+            }
+        }
+        // The layer controls get their listeners back from showLayerTools(), which is also the
+        // only place allowed to set them programmatically.
+        textureLinesCheck.setOnCheckedChangeListener { _, checked ->
+            viewport.setUvOverlay(checked)
+            report(
+                getString(
+                    if (checked) R.string.status_texture_lines_on else R.string.status_texture_lines_off
+                )
+            )
+        }
 
         if (!Native.isAvailable) {
             importButton.isEnabled = false
@@ -165,13 +251,14 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             shadingGroup.isEnabled = false
             viewGroup.isEnabled = false
             findViewById<View>(R.id.openUvEditor).isEnabled = false
+            findViewById<View>(R.id.openTexture).isEnabled = false
             viewport.isEnabled = false
             appendLine(getString(R.string.status_native_missing, Native.loadError ?: "?"))
             renderLog()
             return
         }
 
-        appendLine(getString(R.string.phase_3_status))
+        appendLine(getString(R.string.phase_4_status))
         appendLine("nativo: ${Native.nativeBuildInfo()}")
         renderLog()
         refreshHierarchy()
@@ -211,16 +298,26 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         logButton.setText(if (logVisible) R.string.toggle_log else R.string.toggle_log_hidden)
     }
 
-    /** The right column shows the hierarchy or the UV tools, never both: neither fits twice. */
+    /** The right column shows the hierarchy, the UV tools or the texture stack, never two at once. */
     private fun toggleSidePanel() {
-        if (uvPanel.visibility == View.VISIBLE) {
-            uvPanel.visibility = View.GONE
-            hierarchyPanel.visibility = View.VISIBLE
-            return
+        when {
+            hierarchyPanel.visibility == View.VISIBLE -> {
+                hierarchyPanel.visibility = View.GONE
+                if (uvOpen) uvPanel.visibility = View.VISIBLE else texturePanel.visibility = View.VISIBLE
+            }
+            uvPanel.visibility == View.VISIBLE -> {
+                uvPanel.visibility = View.GONE
+                texturePanel.visibility = View.VISIBLE
+            }
+            texturePanel.visibility == View.VISIBLE -> {
+                texturePanel.visibility = View.GONE
+                hierarchyPanel.visibility = View.VISIBLE
+            }
+            else -> hierarchyPanel.visibility = View.VISIBLE
         }
-        hierarchyPanel.visibility = if (hierarchyPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-        if (uvOpen && hierarchyPanel.visibility == View.GONE) {
-            uvPanel.visibility = View.VISIBLE
+        if (texturePanel.visibility == View.VISIBLE) {
+            showAtlasForTextures()
+            refreshTextureStack()
         }
     }
 
@@ -404,6 +501,268 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         viewport.requestRender()
     }
 
+    // --- compositor de texturas -------------------------------------------------------------
+
+    private fun openTexturePanel() {
+        if (!Native.isAvailable) return
+        hierarchyPanel.visibility = View.GONE
+        uvPanel.visibility = View.GONE
+        texturePanel.visibility = View.VISIBLE
+        showAtlasForTextures()
+        refreshTextureStack()
+    }
+
+    /** The compositor paints the atlas, so the panel is useless without the 2D view. */
+    private fun showAtlasForTextures() {
+        if (viewGroup.checkedButtonId != R.id.viewThreeD) return
+        viewGroup.check(R.id.viewSplit)
+        viewport.frameAtlas()
+    }
+
+    private fun startImageImport() {
+        if (busy || !Native.isAvailable) return
+        // One tap does both: a stack without a canvas cannot hold an image, and asking for the
+        // canvas first would be a hidden prerequisite.
+        if (!Native.nativeTextureHasCanvas() && !applyTextureCanvas()) return
+        openImage.launch(arrayOf("image/*"))
+    }
+
+    private fun applyTextureCanvas(): Boolean {
+        val side = integerField(textureCanvasField, 0)
+        if (side < MIN_TEXTURE_SIDE || side > MAX_TEXTURE_SIDE) {
+            report(getString(R.string.status_texture_bad_canvas))
+            return false
+        }
+        val reply = Native.nativeTextureSetCanvas(side, side)
+        if (reply.startsWith("ERROR:")) {
+            report(getString(R.string.status_texture_canvas_failed, reply.removePrefix("ERROR:").trim()))
+            return false
+        }
+        report(getString(R.string.status_texture_canvas, side, side))
+        refreshTextureStack()
+        viewport.requestRender()
+        return true
+    }
+
+    private fun applyTextureBackground() {
+        if (!Native.isAvailable) return
+        val hex = textureBackgroundField.text.toString().trim().removePrefix("#")
+        val rgb = hex.toLongOrNull(16)
+        if (hex.length != 6 || rgb == null) {
+            report(getString(R.string.status_texture_bad_background))
+            return
+        }
+        Native.nativeTextureSetBackground(rgb.toInt())
+        report(getString(R.string.status_texture_background, hex.uppercase(Locale.US)))
+        refreshTextureStack()
+        viewport.requestRender()
+    }
+
+    private fun importTextureImage(uri: Uri) {
+        if (busy) return
+        val name = displayName(uri)
+        val extension = name.substringAfterLast('.', "").lowercase(Locale.US)
+        if (extension !in SUPPORTED_IMAGE_EXTENSIONS) {
+            report(getString(R.string.status_texture_unsupported_image, extension.ifEmpty { "?" }))
+            return
+        }
+        beginWork(getString(R.string.status_texture_importing, name))
+        Thread {
+            val outcome = try {
+                readContents(uri, MAX_IMAGE_BYTES)
+            } catch (error: Throwable) {
+                Failure(getString(R.string.status_read_error, error.message ?: "?"))
+            }
+            var added = -1
+            val message = when (outcome) {
+                is Failure -> outcome.message
+                is Contents -> {
+                    val reply = Native.nativeTextureImportImage(outcome.bytes, name)
+                    if (reply.startsWith("ERROR:")) {
+                        getString(
+                            R.string.status_texture_import_failed,
+                            name,
+                            reply.removePrefix("ERROR:").trim()
+                        )
+                    } else {
+                        added = reply.lineSequence()
+                            .firstOrNull { it.startsWith("camada=") }
+                            ?.substringAfter('=')
+                            ?.toIntOrNull() ?: -1
+                        getString(R.string.status_texture_imported, added, name)
+                    }
+                }
+            }
+            runOnUiThread {
+                if (added >= 0) {
+                    selectedLayer = added
+                }
+                finishWork(message)
+                refreshTextureStack()
+                viewport.requestRender()
+            }
+        }.start()
+    }
+
+    private fun duplicateLayer() {
+        if (busy || selectedLayer < 0) {
+            report(getString(R.string.status_texture_no_layer))
+            return
+        }
+        val reply = Native.nativeTextureDuplicate(selectedLayer)
+        if (reply.startsWith("ERROR:")) {
+            report(getString(R.string.status_texture_failed, reply.removePrefix("ERROR:").trim()))
+        } else {
+            reply.lineSequence()
+                .firstOrNull { it.startsWith("camada=") }
+                ?.substringAfter('=')
+                ?.toIntOrNull()
+                ?.let { selectedLayer = it }
+        }
+        refreshTextureStack()
+        viewport.requestRender()
+    }
+
+    private fun nudgeLayer(dxPixels: Float, dyPixels: Float) {
+        textureTool(getString(R.string.texture_name_move)) {
+            Native.nativeTextureTranslate(selectedLayer, dxPixels, dyPixels)
+        }
+    }
+
+    private fun rotateLayer(degrees: Float) {
+        textureTool(getString(R.string.texture_name_rotate)) { Native.nativeTextureRotate(selectedLayer, degrees) }
+    }
+
+    /** One press on a layer tool: run it, say whether it did anything, and show the new stack. */
+    private fun textureTool(name: String, action: () -> Boolean) {
+        if (busy || !Native.isAvailable) return
+        if (selectedLayer < 0) {
+            report(getString(R.string.status_texture_no_layer))
+            return
+        }
+        if (!action()) {
+            report(getString(R.string.status_texture_noop, name))
+        }
+        refreshTextureStack()
+        viewport.requestRender()
+    }
+
+    private fun refreshTextureStack() {
+        if (!Native.isAvailable) return
+        val lines = Native.nativeTextureInfo().lineSequence().filter { it.isNotBlank() }.toList()
+        var summary = lines.firstOrNull().orEmpty()
+        textureList.removeAllViews()
+        textureRows.clear()
+        textureStats.clear()
+        for (line in lines.drop(1)) {
+            val parts = line.split(" | ")
+            val id = parts.firstOrNull()?.trim()?.toIntOrNull() ?: continue
+            val name = parts.getOrElse(1) { "camada #$id" }
+            val stats = parts.drop(2).joinToString(" · ")
+            textureStats[id] = stats
+            val row = layoutInflater.inflate(R.layout.hierarchy_row, textureList, false)
+            row.findViewById<TextView>(R.id.rowName).text = name
+            row.findViewById<TextView>(R.id.rowStats).text = stats
+            row.setOnClickListener { selectLayer(id) }
+            textureList.addView(row)
+            textureRows.add(id to row)
+        }
+        if (textureRows.isEmpty()) {
+            selectedLayer = -1
+            summary += "\n" + getString(R.string.texture_none)
+        } else if (textureStats[selectedLayer] == null) {
+            selectedLayer = textureRows.first().first
+        }
+        textureSummary.text = summary
+        highlightLayers()
+        showLayerTools()
+    }
+
+    private fun selectLayer(id: Int) {
+        selectedLayer = id
+        highlightLayers()
+        showLayerTools()
+        report(getString(R.string.status_texture_selected, id))
+    }
+
+    private fun highlightLayers() {
+        textureRows.forEach { (id, row) ->
+            row.findViewById<View>(R.id.rowHighlight).visibility =
+                if (id == selectedLayer) View.VISIBLE else View.GONE
+        }
+    }
+
+    /** The controls mirror the selected layer, so they are read back from the stack every time. */
+    private fun showLayerTools() {
+        val stats = textureStats[selectedLayer]
+        textureVisibleCheck.setOnCheckedChangeListener(null)
+        textureOpacityBar.setOnSeekBarChangeListener(null)
+        textureVisibleCheck.isEnabled = stats != null
+        textureOpacityBar.isEnabled = stats != null
+        val visible = stats?.contains("oculta") == false
+        val percent = stats?.let { OPACITY_PATTERN.find(it)?.groupValues?.get(1)?.toIntOrNull() } ?: 100
+        textureVisibleCheck.isChecked = visible
+        textureOpacityBar.progress = percent
+        textureOpacityLabel.text = getString(R.string.texture_opacity) + " " + percent + "%"
+        textureVisibleCheck.setOnCheckedChangeListener { _, checked ->
+            if (selectedLayer >= 0 && Native.nativeTextureSetVisible(selectedLayer, checked)) {
+                refreshTextureStack()
+                viewport.requestRender()
+            }
+        }
+        textureOpacityBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
+                textureOpacityLabel.text = getString(R.string.texture_opacity) + " " + value + "%"
+                if (fromUser && selectedLayer >= 0) {
+                    Native.nativeTextureSetOpacity(selectedLayer, value / 100.0f)
+                    refreshTextureStack()
+                    viewport.requestRender()
+                }
+            }
+
+            override fun onStartTrackingTouch(bar: SeekBar?) = Unit
+
+            override fun onStopTrackingTouch(bar: SeekBar?) = Unit
+        })
+    }
+
+    private fun exportTexture() {
+        if (busy || !Native.isAvailable) return
+        if (!Native.nativeTextureHasCanvas()) {
+            report(getString(R.string.status_texture_bad_canvas))
+            return
+        }
+        createPng.launch("textura.png")
+    }
+
+    private fun writeTexturePng(uri: Uri) {
+        if (busy) return
+        beginWork(getString(R.string.status_texture_exporting))
+        Thread {
+            val startedAt = System.currentTimeMillis()
+            val message = try {
+                val png = Native.nativeTexturePng()
+                if (png == null || png.isEmpty()) {
+                    getString(R.string.status_texture_export_empty)
+                } else {
+                    val stream = contentResolver.openOutputStream(uri)
+                    if (stream == null) {
+                        getString(R.string.status_read_error, "fluxo indisponível")
+                    } else {
+                        stream.use { it.write(png) }
+                        getString(
+                            R.string.status_texture_exported,
+                            "${png.size / 1024} KB em ${System.currentTimeMillis() - startedAt} ms"
+                        )
+                    }
+                }
+            } catch (error: Throwable) {
+                getString(R.string.status_texture_export_failed, error.message ?: "?")
+            }
+            runOnUiThread { finishWork(message) }
+        }.start()
+    }
+
     // --- import --------------------------------------------------------------------------
 
     private fun importUri(uri: Uri) {
@@ -481,7 +840,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     }
 
     /** Caps the size before allocating, because a huge file must not take the process down. */
-    private fun readContents(uri: Uri): ReadOutcome {
+    private fun readContents(uri: Uri, maxBytes: Long = MAX_MODEL_BYTES): ReadOutcome {
         val stream = contentResolver.openInputStream(uri)
             ?: return Failure(getString(R.string.status_read_error, "fluxo indisponível"))
         stream.use {
@@ -492,12 +851,12 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                 val read = it.read(chunk)
                 if (read < 0) break
                 total += read
-                if (total > MAX_MODEL_BYTES) {
+                if (total > maxBytes) {
                     return Failure(
                         getString(
                             R.string.status_file_too_large,
                             (total / MEGABYTE).toInt(),
-                            (MAX_MODEL_BYTES / MEGABYTE).toInt()
+                            (maxBytes / MEGABYTE).toInt()
                         )
                     )
                 }
@@ -624,8 +983,23 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
     private companion object {
         val SUPPORTED_EXTENSIONS = setOf("obj", "gltf", "glb")
+        val SUPPORTED_IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg")
+        val OPACITY_PATTERN = Regex("op=(\\d+)%")
         const val MEGABYTE = 1024L * 1024L
         const val MAX_MODEL_BYTES = 96L * MEGABYTE
+        const val MAX_IMAGE_BYTES = 32L * MEGABYTE
+        const val MIN_TEXTURE_SIDE = 16
+        const val MAX_TEXTURE_SIDE = 8192
+
+        // A button press moves the layer by this many canvas pixels; the atlas zoom is the
+        // fine tool, so the step has to stay useful from 16 px to 8192 px.
+        const val TEXTURE_MOVE_STEP = 16.0f
+
+        // Renderer shading modes, mirrored in g3d_renderer.hpp.
+        const val SHADING_SOLID = 0
+        const val SHADING_NORMALS = 1
+        const val SHADING_TEXTURED = 3
+        const val SHADING_CHECKER = 4
         const val STREAM_CHUNK = 64 * 1024
         const val LOG_LIMIT = 8000
 

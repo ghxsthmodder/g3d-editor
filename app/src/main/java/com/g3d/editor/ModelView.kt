@@ -107,6 +107,13 @@ class ModelView @JvmOverloads constructor(
         requestRender()
     }
 
+    /** Hides the UV wireframe over the atlas. A viewing state, so no GL call is needed. */
+    fun setUvOverlay(visible: Boolean) {
+        if (!Native.isAvailable) return
+        Native.nativeSetUvOverlay(visible)
+        requestRender()
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!Native.isAvailable) return false
 

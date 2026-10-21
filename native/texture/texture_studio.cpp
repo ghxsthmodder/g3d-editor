@@ -1,5 +1,8 @@
 #include "texture/texture_studio.hpp"
 
+#include <cstdio>
+#include <sstream>
+
 namespace g3d {
 
 TextureStudio &TextureStudio::instance() {
@@ -171,6 +174,43 @@ bool TextureStudio::texture(Image &out) {
 bool TextureStudio::render(Image &out, std::string &error) {
     std::lock_guard<std::mutex> guard(mutex_);
     return renderLocked(out, error);
+}
+
+std::string TextureStudio::describe() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    std::ostringstream stream;
+    if (composition_.canvasWidth() <= 0 || composition_.canvasHeight() <= 0) {
+        stream << "tela não definida";
+    } else {
+        stream << "tela=" << composition_.canvasWidth() << "x" << composition_.canvasHeight();
+    }
+    uint8_t rgb[3];
+    composition_.background(rgb);
+    char colour[16];
+    std::snprintf(colour, sizeof(colour), "#%02X%02X%02X", rgb[0], rgb[1], rgb[2]);
+    stream << " camadas=" << composition_.layers().size() << " fundo=" << colour
+           << " mem=" << (static_cast<double>(composition_.memoryBytes()) / (1024.0 * 1024.0))
+           << "MB";
+    return stream.str();
+}
+
+std::string TextureStudio::layerRows() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    const std::vector<TextureLayer> &layers = composition_.layers();
+    std::string text;
+    for (size_t position = layers.size(); position-- > 0;) {
+        const TextureLayer &layer = layers[position];
+        char line[256];
+        std::snprintf(line, sizeof(line),
+                      "%d | %s | op=%d%% · %.0f,%.0f · %d%% · %.0f°%s\n",
+                      layer.id, layer.name.c_str(),
+                      static_cast<int>(layer.opacity * 100.0f + 0.5f), layer.centreX,
+                      layer.centreY,
+                      static_cast<int>(layer.scaleX * 100.0f + 0.5f), layer.rotationDegrees,
+                      layer.visible ? "" : " · oculta");
+        text += line;
+    }
+    return text;
 }
 
 void TextureStudio::reset() {

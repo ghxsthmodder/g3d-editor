@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">G3D Editor</string>
-    <string name="phase_3_status">fase 3: geração e edição de UVs</string>
+    <string name="phase_4_status">fase 4: composição de texturas por camadas</string>
 
     <string name="import_model">Importar</string>
     <string name="frame_scene">Reenquadrar</string>
@@ -9,10 +9,13 @@
     <string name="label_view">Vista:</string>
     <string name="shading_solid">Sólido</string>
     <string name="shading_normals">Normais</string>
+    <string name="shading_texture">Textura</string>
+    <string name="shading_checker">Grade</string>
     <string name="view_split">3D+UV</string>
     <string name="view_three_d">3D</string>
     <string name="view_atlas">UV</string>
     <string name="open_uv_editor">Editor UV</string>
+    <string name="open_texture">Texturas</string>
     <string name="toggle_panel">Painel</string>
     <string name="toggle_log">Log ▾</string>
     <string name="toggle_log_hidden">Log ▸</string>
@@ -75,6 +78,54 @@
     <string name="status_uv_additive_off">toque substitui a seleção</string>
     <string name="status_uv_bad_number">margem entre 1 e 9999 texels; resolução 0 (automática) ou entre 1 e 8192</string>
 
+
+    <string name="texture_title">Texturas</string>
+    <string name="texture_none">nenhuma camada — importe uma imagem</string>
+    <string name="texture_import">Imagem</string>
+    <string name="texture_export">PNG</string>
+    <string name="texture_canvas_hint">resolução</string>
+    <string name="texture_canvas_default">1024</string>
+    <string name="texture_canvas_apply">Tela</string>
+    <string name="texture_background_hint">fundo RRGGBB</string>
+    <string name="texture_background_default">2E323C</string>
+    <string name="texture_background_apply">Fundo</string>
+    <string name="texture_stack_title">Pilha</string>
+    <string name="texture_tools_title">Camada selecionada</string>
+    <string name="texture_duplicate">Duplicar</string>
+    <string name="texture_remove">Remover</string>
+    <string name="texture_up">Subir</string>
+    <string name="texture_down">Descer</string>
+    <string name="texture_visible">Visível</string>
+    <string name="texture_opacity">Opacidade</string>
+    <string name="texture_uv_lines">Linhas UV</string>
+
+    <string name="status_texture_importing">importando %1$s …</string>
+    <string name="status_texture_imported">camada %1$d adicionada de %2$s</string>
+    <string name="status_texture_import_failed">não foi possível usar %1$s: %2$s</string>
+    <string name="status_texture_unsupported_image">imagem em .%1$s não suportada nesta versão (use .png, .jpg ou .jpeg)</string>
+    <string name="status_texture_no_layer">nenhuma camada selecionada — toque em uma da pilha</string>
+    <string name="status_texture_noop">%1$s não fez nada: a camada saiu da pilha</string>
+    <string name="status_texture_canvas">tela da textura em %1$d × %2$d px</string>
+    <string name="status_texture_canvas_failed">a tela não foi aceita: %1$s</string>
+    <string name="status_texture_bad_canvas">a resolução vai de 16 a 8192 px por lado</string>
+    <string name="status_texture_background">fundo da textura em #%1$s</string>
+    <string name="status_texture_bad_background">fundo: seis dígitos hexadecimais, por exemplo 2E323C</string>
+    <string name="status_texture_exporting">compondo e gravando o PNG …</string>
+    <string name="status_texture_exported">textura exportada (%1$s)</string>
+    <string name="status_texture_export_failed">a exportação falhou: %1$s</string>
+    <string name="status_texture_export_cancelled">exportação cancelada</string>
+    <string name="status_texture_lines_on">linhas UV visíveis sobre a textura</string>
+    <string name="status_texture_lines_off">linhas UV ocultas: só a composição aparece</string>
+    <string name="status_texture_selected">camada %1$d selecionada</string>
+    <string name="status_texture_failed">a pilha recusou: %1$s</string>
+    <string name="status_texture_export_empty">nada para exportar: a textura não pôde ser composta</string>
+
+    <string name="texture_name_remove">remover</string>
+    <string name="texture_name_move">mover</string>
+    <string name="texture_name_rotate">girar</string>
+    <string name="texture_name_scale">escalar</string>
+    <string name="texture_name_order_up">subir na pilha</string>
+    <string name="texture_name_order_down">descer na pilha</string>
     <string name="status_native_missing">Biblioteca nativa não carregada: %1$s</string>
     <string name="status_importing">importando %1$s …</string>
     <string name="status_import_failed">falha ao importar %1$s: %2$s</string>

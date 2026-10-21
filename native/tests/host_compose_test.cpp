@@ -1,6 +1,7 @@
 // Host harness for the compositor: builds the layer stack in memory and checks the pixels it
 // paints. Built by the host CMake branch, not part of the APK.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -9,6 +10,7 @@
 
 #include "texture/g3d_image.hpp"
 #include "texture/texture_layer.hpp"
+#include "texture/texture_studio.hpp"
 
 namespace {
 
@@ -270,6 +272,47 @@ void testLayerBudget() {
     check(big.memoryBytes() == heavy.pixels.size(), "a camada recusada não fica na pilha");
 }
 
+// The panel of the phone parses the two strings below, so their shape is part of the contract
+// between the native stack and the Kotlin side and not a free-form debug print.
+void testStudioText() {
+    g3d::TextureStudio &studio = g3d::TextureStudio::instance();
+    std::string error;
+    studio.reset();
+    check(studio.describe().find("tela não definida") != std::string::npos,
+          "sem tela o resumo diz que falta tela");
+    check(studio.layerRows().empty(), "sem camadas não há linhas de pilha");
+    check(studio.setCanvas(64, 64, error), "a tela do estúdio é aceita");
+    check(studio.describe().find("tela=64x64") != std::string::npos, "o resumo traz a tela");
+    const uint8_t tint[3] = {0x12, 0x34, 0x56};
+    studio.setBackground(tint);
+    check(studio.describe().find("fundo=#123456") != std::string::npos, "o resumo traz o fundo");
+
+    const int lower = studio.addLayer(solid(8, 8, 200, 30, 30, 255, "vermelho.png"), error);
+    const int upper = studio.addLayer(solid(8, 8, 30, 200, 30, 255, "verde.png"), error);
+    check(lower > 0 && upper > 0, "duas camadas entram no estúdio");
+    studio.setOpacity(lower, 0.5f);
+    studio.setVisible(upper, false);
+    studio.translate(upper, 8.0f, -4.0f);
+
+    const std::string rows = studio.layerRows();
+    const size_t endOfFirst = rows.find('\n');
+    const std::string firstLine = rows.substr(0, endOfFirst);
+    check(firstLine.rfind(std::to_string(upper) + " | verde.png |", 0) == 0,
+          "a camada do topo da pilha vem na primeira linha");
+    check(firstLine.find("oculta") != std::string::npos, "a camada invisível é marcada como oculta");
+    check(rows.find("op=50%") != std::string::npos, "a opacidade aparece na linha");
+    check(rows.find("40,28") != std::string::npos, "o centro da camada aparece na linha");
+    check(rows.find("32,32") != std::string::npos, "a camada quieta está no centro da tela");
+    check(std::count(rows.begin(), rows.end(), '\n') == 2, "uma linha por camada");
+
+    studio.removeLayer(upper);
+    check(studio.layerRows().find("vermelho.png") != std::string::npos &&
+              studio.layerRows().find("verde.png") == std::string::npos,
+          "remover some com a linha da camada");
+    studio.reset();
+    check(studio.layerRows().empty(), "o reset esvazia a pilha do estúdio");
+}
+
 }  // namespace
 
 int main() {
@@ -281,6 +324,7 @@ int main() {
     testOrderDuplicateRemove();
     testDeterminismAndPng();
     testLayerBudget();
+    testStudioText();
     std::printf("%d checagens, %d falhas\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

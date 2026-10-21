@@ -12,6 +12,8 @@
 #include "core/document.hpp"
 #include "core/primitives.hpp"
 #include "renderer/g3d_renderer.hpp"
+#include "texture/g3d_image.hpp"
+#include "texture/texture_studio.hpp"
 #include "uv/uv_editor.hpp"
 #include "uv/uv_service.hpp"
 
@@ -48,6 +50,14 @@ std::string uvRangeReport(const g3d::UvResult &result) {
 
 jstring toJString(JNIEnv *env, const std::string &text) {
     return env->NewStringUTF(text.c_str());
+}
+
+// Every compositor mutator answers with the same summary line, so the panel never has to guess
+// what the stack looks like now.
+jstring studioReply(JNIEnv *env, const char *prefix) {
+    std::ostringstream stream;
+    stream << prefix << "\n" << g3d::TextureStudio::instance().describe();
+    return toJString(env, stream.str());
 }
 
 }  // namespace
@@ -362,6 +372,165 @@ JNIEXPORT jint JNICALL Java_com_g3d_editor_Native_nativeUvPick(JNIEnv *, jclass,
         return -1;
     }
     return static_cast<jint>(g3d::UvEditor::instance().pick(uv[0], uv[1]));
+}
+
+// The UV wireframe is a viewing aid, so hiding it is a renderer state and not a change to the
+// composed picture.
+JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeSetUvOverlay(JNIEnv *, jclass,
+                                                                     jboolean visible) {
+    g3d::Renderer::instance().setUvOverlayVisible(visible == JNI_TRUE);
+}
+
+// --- compositor de texturas ---------------------------------------------------------------
+// The stack guards itself, so these run on any thread. Only importing and exporting do enough
+// work to be worth a background thread; the UI refreshes the list from nativeTextureInfo().
+
+JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeTextureImportImage(JNIEnv *env, jclass,
+                                                                              jbyteArray data,
+                                                                              jstring fileNameHint) {
+    if (data == nullptr || env->GetArrayLength(data) == 0) {
+        return toJString(env, "ERROR: arquivo vazio");
+    }
+    std::string hint;
+    if (fileNameHint != nullptr) {
+        const char *chars = env->GetStringUTFChars(fileNameHint, nullptr);
+        if (chars != nullptr) {
+            hint = chars;
+            env->ReleaseStringUTFChars(fileNameHint, chars);
+        }
+    }
+    const jsize length = env->GetArrayLength(data);
+    std::vector<jbyte> buffer(static_cast<size_t>(length));
+    env->GetByteArrayRegion(data, 0, length, buffer.data());
+
+    // Decoding and composing are CPU work on a buffer the JVM owns; the copy above releases the
+    // array before any of it happens.
+    g3d::Image image;
+    std::string error;
+    if (!g3d::decodeImage(buffer.data(), static_cast<size_t>(length), hint, image, error)) {
+        return toJString(env, "ERROR: " + error);
+    }
+    const int id = g3d::TextureStudio::instance().addLayer(image, error);
+    if (id <= 0) {
+        return toJString(env, "ERROR: " + error);
+    }
+    std::ostringstream stream;
+    stream << "OK\ncamada=" << id << "\n" << g3d::TextureStudio::instance().describe();
+    __android_log_print(ANDROID_LOG_INFO, kTag, "texture layer %d from %s", id, hint.c_str());
+    return toJString(env, stream.str());
+}
+
+JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeTextureInfo(JNIEnv *env, jclass) {
+    g3d::TextureStudio &studio = g3d::TextureStudio::instance();
+    std::ostringstream stream;
+    stream << studio.describe() << "\n" << studio.layerRows();
+    return toJString(env, stream.str());
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureHasCanvas(JNIEnv *, jclass) {
+    g3d::TextureStudio &studio = g3d::TextureStudio::instance();
+    return studio.canvasWidth() > 0 && studio.canvasHeight() > 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeTextureSetCanvas(JNIEnv *env, jclass,
+                                                                            jint width,
+                                                                            jint height) {
+    std::string error;
+    if (!g3d::TextureStudio::instance().setCanvas(width, height, error)) {
+        return toJString(env, "ERROR: " + error);
+    }
+    return studioReply(env, "OK");
+}
+
+// 0xRRGGBB, which is how Android already spells a colour.
+JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeTextureSetBackground(JNIEnv *, jclass,
+                                                                             jint rgb) {
+    const uint8_t colour[3] = {
+        static_cast<uint8_t>((rgb >> 16) & 0xff),
+        static_cast<uint8_t>((rgb >> 8) & 0xff),
+        static_cast<uint8_t>(rgb & 0xff),
+    };
+    g3d::TextureStudio::instance().setBackground(colour);
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureRemove(JNIEnv *, jclass,
+                                                                          jint id) {
+    return g3d::TextureStudio::instance().removeLayer(id) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeTextureDuplicate(JNIEnv *env, jclass,
+                                                                           jint id) {
+    int newId = 0;
+    std::string error;
+    if (!g3d::TextureStudio::instance().duplicateLayer(id, newId, error)) {
+        return toJString(env, "ERROR: " + error);
+    }
+    std::ostringstream stream;
+    stream << "OK\ncamada=" << newId;
+    return toJString(env, stream.str());
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureMoveUp(JNIEnv *, jclass,
+                                                                          jint id) {
+    return g3d::TextureStudio::instance().moveUp(id) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureMoveDown(JNIEnv *, jclass,
+                                                                            jint id) {
+    return g3d::TextureStudio::instance().moveDown(id) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureSetVisible(JNIEnv *, jclass,
+                                                                              jint id,
+                                                                              jboolean visible) {
+    return g3d::TextureStudio::instance().setVisible(id, visible == JNI_TRUE) ? JNI_TRUE
+                                                                              : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureSetOpacity(JNIEnv *, jclass,
+                                                                              jint id,
+                                                                              jfloat opacity) {
+    return g3d::TextureStudio::instance().setOpacity(id, opacity) ? JNI_TRUE : JNI_FALSE;
+}
+
+// Distances are canvas pixels, with y growing downwards like it does in the exported PNG.
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureTranslate(JNIEnv *, jclass,
+                                                                             jint id, jfloat dx,
+                                                                             jfloat dy) {
+    return g3d::TextureStudio::instance().translate(id, dx, dy) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureRotate(JNIEnv *, jclass, jint id,
+                                                                          jfloat degrees) {
+    return g3d::TextureStudio::instance().rotate(id, degrees) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureScale(JNIEnv *, jclass, jint id,
+                                                                         jfloat factor) {
+    return g3d::TextureStudio::instance().scaleBy(id, factor) ? JNI_TRUE : JNI_FALSE;
+}
+
+// The exported file is the exact picture the preview uploads, straight out of the compositor: no
+// second code path that could disagree with the screen. Null when there is nothing to write; the
+// reason goes to logcat because a byte array has no room for a message.
+JNIEXPORT jbyteArray JNICALL Java_com_g3d_editor_Native_nativeTexturePng(JNIEnv *env, jclass) {
+    std::string error;
+    g3d::Image picture;
+    if (!g3d::TextureStudio::instance().render(picture, error)) {
+        __android_log_print(ANDROID_LOG_ERROR, kTag, "texture render: %s", error.c_str());
+        return nullptr;
+    }
+    std::vector<uint8_t> png;
+    if (!g3d::encodePng(picture, png, error)) {
+        __android_log_print(ANDROID_LOG_ERROR, kTag, "texture encode: %s", error.c_str());
+        return nullptr;
+    }
+    jbyteArray out = env->NewByteArray(static_cast<jsize>(png.size()));
+    if (out != nullptr) {
+        env->SetByteArrayRegion(out, 0, static_cast<jsize>(png.size()),
+                                reinterpret_cast<const jbyte *>(png.data()));
+    }
+    return out;
 }
 
 }  // extern "C"

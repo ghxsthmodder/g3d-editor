@@ -364,6 +364,320 @@
                     android:text="@string/uv_apply" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- The compositor: the stack on top, the tools of the selected layer below. It scrolls
+             because a phone cannot show eleven controls at 232 dp without stealing the model. -->
+        <ScrollView
+            android:id="@+id/texturePanel"
+            android:layout_width="232dp"
+            android:layout_height="match_parent"
+            android:background="@color/editor_panel"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="6dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/texture_title"
+                    android:textAllCaps="true"
+                    android:textColor="@color/editor_text_dim"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/textureSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="4dp"
+                    android:textColor="@color/editor_text_dim"
+                    android:textSize="11sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/textureCanvas"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:autofillHints="none"
+                        android:hint="@string/texture_canvas_hint"
+                        android:inputType="number"
+                        android:maxLength="5"
+                        android:text="@string/texture_canvas_default"
+                        android:textSize="12sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureSetCanvas"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="@string/texture_canvas_apply" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureImportImage"
+                        style="@style/ToolButton.Tonal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="@string/texture_import" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/textureBackground"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:autofillHints="none"
+                        android:hint="@string/texture_background_hint"
+                        android:inputType="textCapCharacters"
+                        android:maxLength="7"
+                        android:text="@string/texture_background_default"
+                        android:textSize="12sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureSetBackground"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="@string/texture_background_apply" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureExport"
+                        style="@style/ToolButton.Tonal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="@string/texture_export" />
+                </LinearLayout>
+
+                <CheckBox
+                    android:id="@+id/textureUvLines"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="@string/texture_uv_lines"
+                    android:textColor="@color/editor_text"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="4dp"
+                    android:text="@string/texture_stack_title"
+                    android:textAllCaps="true"
+                    android:textColor="@color/editor_text_dim"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/textureList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="6dp"
+                    android:text="@string/texture_tools_title"
+                    android:textAllCaps="true"
+                    android:textColor="@color/editor_text_dim"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureDuplicate"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/texture_duplicate" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureRemove"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/texture_remove" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureMoveUpStack"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/texture_up" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureMoveDownStack"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/texture_down" />
+                </LinearLayout>
+
+                <CheckBox
+                    android:id="@+id/textureVisible"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="@string/texture_visible"
+                    android:textColor="@color/editor_text"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/textureOpacityLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/texture_opacity"
+                    android:textColor="@color/editor_text_dim"
+                    android:textSize="11sp" />
+
+                <SeekBar
+                    android:id="@+id/textureOpacity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="100"
+                    android:progress="100" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureUp"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="64dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/uv_move_up" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/textureLeft"
+                            style="@style/ToolButton.Outlined"
+                            android:layout_width="64dp"
+                            android:layout_height="wrap_content"
+                            android:text="@string/uv_move_left" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/textureDown"
+                            style="@style/ToolButton.Outlined"
+                            android:layout_width="64dp"
+                            android:layout_height="wrap_content"
+                            android:text="@string/uv_move_down" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/textureRight"
+                            style="@style/ToolButton.Outlined"
+                            android:layout_width="64dp"
+                            android:layout_height="wrap_content"
+                            android:text="@string/uv_move_right" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureRotateMinus90"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/uv_rotate_minus_90" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureRotateMinus15"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/uv_rotate_minus_15" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureRotatePlus15"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/uv_rotate_plus_15" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureRotatePlus90"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/uv_rotate_plus_90" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureScaleDown"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/uv_scale_down" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/textureScaleUp"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/uv_scale_up" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
     </LinearLayout>
 
     <!-- One row of small controls replaces the two full-height bars the editor had, so the model
@@ -425,6 +739,20 @@
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:text="@string/shading_normals" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/shadingTexture"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:text="@string/shading_texture" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/shadingChecker"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:text="@string/shading_checker" />
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <TextView
@@ -472,6 +800,13 @@
                 android:layout_height="match_parent"
                 android:layout_marginStart="8dp"
                 android:text="@string/open_uv_editor" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/openTexture"
+                style="@style/ToolButton.Outlined"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:text="@string/open_texture" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/togglePanel"

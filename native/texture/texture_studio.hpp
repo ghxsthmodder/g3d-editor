@@ -47,6 +47,11 @@ public:
     // Forgets the stack and the picture, used when another model replaces the document.
     void reset();
 
+    // One summary line and one line per layer, topmost first, in the same "id | nome | resto"
+    // shape the mesh hierarchy uses so the panel can parse both the same way.
+    std::string describe() const;
+    std::string layerRows() const;
+
     // Changes whenever the stack does, so the renderer knows when to upload again.
     uint64_t revision();
 

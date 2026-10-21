@@ -50,7 +50,10 @@ licença e os arquivos mantidos.
   usa apenas as declarações dos cabeçalhos via `native/texture/g3d_image.cpp`.
 - Estado: em uso desde a Fase 4 (importação de imagens e exportação PNG do compositor).
 - Tamanho adicionado: a unidade de implementação do stb mede 263 KB como objeto de host em Release
-  (x86-64, com símbolos); a contribuição no `.so` do APK ainda não foi medida.
+  (x86-64, com símbolos). No APK, onde ela é a maior parte do módulo de imagem, o `libg3dnative.so`
+  despojado inteiro mede 4,33 MB (arm64-v8a) e 4,20 MB (x86_64), dentro de um `app-debug.apk` de
+  17 MB — números de um *build* de depuração, que é o único formato que este repositório produz
+  hoje; a contribuição isolada do stb no `.so` não foi medida.
 
 ## GLM
 

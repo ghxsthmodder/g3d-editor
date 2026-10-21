@@ -18,6 +18,8 @@
 #include "core/document.hpp"
 #include "importers/assimp_importer.hpp"
 #include "renderer/g3d_renderer.hpp"
+#include "texture/g3d_image.hpp"
+#include "texture/texture_studio.hpp"
 #include "uv/uv_editor.hpp"
 
 #ifndef G3D_TEST_MODEL_DIR
@@ -62,6 +64,18 @@ bool matches(const std::vector<unsigned char> &pixels, size_t pixel, float red, 
     return std::abs(pixels[offset + 0] - red * scale) <= tolerance &&
            std::abs(pixels[offset + 1] - green * scale) <= tolerance &&
            std::abs(pixels[offset + 2] - blue * scale) <= tolerance;
+}
+
+// Pixels where the layer green beats the canvas blue, whatever the wireframe left on top of it.
+int greenishOnTop(const std::vector<unsigned char> &pixels) {
+    int count = 0;
+    for (size_t pixel = 0; pixel < pixels.size() / 4; ++pixel) {
+        const size_t offset = pixel * 4;
+        if (pixels[offset + 1] > 120 && pixels[offset + 1] > pixels[offset + 2] + 30) {
+            ++count;
+        }
+    }
+    return count;
 }
 
 int countForeground(const std::vector<unsigned char> &pixels) {
@@ -418,6 +432,110 @@ int main() {
     const AtlasSample emptyCentre = sample(centreY, centreY);
     check(emptyCentre.hit && std::fabs(emptyCentre.u - 0.5f) < 2e-3f,
           "o atlas vazio continua mapeando toques, u=" + std::to_string(emptyCentre.u));
+
+    // --- the composed texture reaches both views ---------------------------------------
+    // One layer of pure green over a blue canvas: a colour the solid shading cannot produce, so
+    // seeing it proves the picture really went through the compositor and into GL.
+    g3d::TextureStudio &studio = g3d::TextureStudio::instance();
+    std::string composeError;
+    check(studio.setCanvas(64, 64, composeError), "o compositor recebe a tela do atlas");
+    const uint8_t canvasBackground[3] = {0, 0, 255};
+    studio.setBackground(canvasBackground);
+    g3d::Image dot;
+    const uint8_t green[4] = {0, 255, 0, 255};
+    dot.allocate(16, 16, green);
+    dot.name = "ponto.png";
+    const int dotLayer = studio.addLayer(dot, composeError);
+    check(dotLayer > 0, "a camada importada entra na pilha");
+
+    renderer.setViewMode(g3d::Renderer::kViewThreeDimensional);
+    renderer.setShadingMode(g3d::Renderer::kShadeTextured);
+    renderer.draw();
+    check(glGetError() == GL_NO_ERROR, "nenhum erro de GL no modo texturizado");
+    const std::vector<unsigned char> textured = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "textura", textured);
+    int greenish = 0;
+    for (size_t pixel = 0; pixel < textured.size() / 4; ++pixel) {
+        const size_t offset = pixel * 4;
+        if (textured[offset + 1] > 60 && textured[offset + 1] > textured[offset + 0] + 30 &&
+            textured[offset + 1] > textured[offset + 2] + 30) {
+            ++greenish;
+        }
+    }
+    check(greenish > 50, "o modelo amostra a camada verde da textura, pixels=" +
+                             std::to_string(greenish));
+    int texturedChanged = 0;
+    for (size_t i = 0; i < solid.size(); ++i) {
+        if (std::abs(static_cast<int>(solid[i]) - static_cast<int>(textured[i])) > 8) {
+            ++texturedChanged;
+        }
+    }
+    check(texturedChanged > 400, "o modo texturizado produz outra imagem, canais=" +
+                                     std::to_string(texturedChanged));
+
+    renderer.setShadingMode(g3d::Renderer::kShadeChecker);
+    renderer.draw();
+    const std::vector<unsigned char> checker = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "grade", checker);
+    int light = 0;
+    int dark = 0;
+    for (size_t pixel = 0; pixel < checker.size() / 4; ++pixel) {
+        if (!matches(checker, pixel, kBackground[0], kBackground[1], kBackground[2], 3.0f)) {
+            if (checker[pixel * 4] > 150) {
+                ++light;
+            } else if (checker[pixel * 4] < 120) {
+                ++dark;
+            }
+        }
+    }
+    check(light > 50 && dark > 50, "a grade de referencia mostra os dois tons, claros=" +
+                                       std::to_string(light) + " escuros=" +
+                                       std::to_string(dark));
+
+    // Back to the atlas: the picture is the background of the square, the wireframe lies on it.
+    renderer.setShadingMode(g3d::Renderer::kShadeSolid);
+    renderer.setViewMode(g3d::Renderer::kViewAtlasOnly);
+    renderer.draw();
+    const std::vector<unsigned char> atlasTextured = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "atlas_textura", atlasTextured);
+    check(greenishOnTop(atlasTextured) > 30,
+          "o atlas mostra a camada como fundo, pixels=" + std::to_string(greenishOnTop(atlasTextured)));
+
+    // Hiding the wireframe is a view decision: the picture underneath has to show unblended.
+    renderer.setUvOverlayVisible(false);
+    renderer.draw();
+    const std::vector<unsigned char> pictureOnly = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "atlas_sem_linhas", pictureOnly);
+    check(matches(pictureOnly, (kSize / 2) * kSize + kSize / 2, 0.0f, 1.0f, 0.0f, 8.0f),
+          "sem as linhas UV o centro do atlas e a cor da camada");
+    check(matches(pictureOnly, (kSize / 2) * kSize + kSize / 2 + 22, 0.0f, 0.0f, 1.0f, 8.0f),
+          "e ao lado dele o fundo do atlas");
+    renderer.setUvOverlayVisible(true);
+
+    // The exported PNG is the composition, so the overlay it never showed stays out of it.
+    g3d::Image exported;
+    check(studio.render(exported, composeError), "o compositor entrega a textura para exportar");
+    if (exported.valid()) {
+        const uint8_t *centre = exported.rgba(32, 32);
+        const uint8_t *edge = exported.rgba(60, 32);
+        check(centre != nullptr && centre[1] == 255 && centre[0] == 0 && centre[2] == 0,
+              "o PNG exportado tem a camada no centro");
+        check(edge != nullptr && edge[2] == 255 && edge[0] == 0 && edge[1] == 0,
+              "e a cor de fundo ao lado, sem linhas UV");
+    } else {
+        check(false, "o PNG exportado tem pixels");
+    }
+
+    // Moving a layer moves the revision, and the renderer has to notice without a re-upload call.
+    // The lines are hidden for this one too: the assertion is about the picture, not the ruler.
+    check(studio.translate(dotLayer, 22.0f, 0.0f), "mover a camada no compositor");
+    renderer.setUvOverlayVisible(false);
+    renderer.draw();
+    const std::vector<unsigned char> afterMove = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "atlas_mudanca", afterMove);
+    check(matches(afterMove, (kSize / 2) * kSize + kSize / 2, 0.0f, 0.0f, 1.0f, 8.0f),
+          "o atlas acompanha a camada que saiu do centro");
+    renderer.setUvOverlayVisible(true);
 
     renderer.setViewMode(g3d::Renderer::kViewThreeDimensional);
     renderer.draw();

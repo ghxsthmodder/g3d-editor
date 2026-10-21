@@ -59,14 +59,18 @@ CTest (nenhum deles faz parte do APK):
 | `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, validar, aplicar/cancelar |
 | `compose_test` | `host_compose_test` | pilha de camadas: fundo, mover, girar, escalar, opacidade, visibilidade, ordem, duplicar, remover, orçamento de memória e o PNG resultante |
 | `image_test` | `host_image_test` | decodificação PNG/JPEG (stb), ida e volta sem perdas do PNG, paleta com transparência, limite de pixels e quadriculado de referência |
-| `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer, incluindo a vista 2D do atlas |
+| `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer: vista 3D, vista 2D do atlas e a textura composta aplicada nos dois modos |
 
 `render_test` só é construído quando o host tem EGL + OpenGL ES 3 (`libegl-dev`,
 `libgles-dev`/Mesa). Ele usa a plataforma *surfaceless* do Mesa e, quando não há contexto
 disponível, imprime `SKIP` e sai com sucesso. Com `G3D_RENDER_PREVIEW=/tmp/look` ele também grava
 PPM para inspecionar a imagem sem telefone: `look.solido.ppm`, `look.normais.ppm`,
 `look.selecao.ppm`, `look.atlas.ppm` (sobreposições em vermelho), `look.ilha.ppm` (ilha selecionada
-em âmbar), `look.repack.ppm`, `look.so_atlas.ppm` e `look.vazio.ppm`.
+em âmbar), `look.repack.ppm`, `look.so_atlas.ppm` e `look.vazio.ppm`. Da Fase 4 entram
+`look.textura.ppm` (modelo sombreado com a composição), `look.grade.ppm` (grade quadriculada de
+referência), `look.atlas_textura.ppm` (a composição desenhada no atlas), `look.atlas_sem_linhas.ppm`
+(atlas com as linhas de UV ocultadas) e `look.atlas_mudanca.ppm` (atlas depois de mover uma camada,
+provando que as duas vistas acompanham).
 
 As fixtures de imagem usadas pelo `image_test` estão em `native/tests/models`: `gradient.jpg`
 (64×64, JPEG *baseline* — o stb recusa JPEG progressivo), `palette.png` (32×32 em paleta com um

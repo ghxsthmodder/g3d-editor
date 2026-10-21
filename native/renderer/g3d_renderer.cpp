@@ -1,8 +1,10 @@
 #include "renderer/g3d_renderer.hpp"
+#include "texture/texture_studio.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 #include <set>
 #include <unordered_map>
@@ -46,14 +48,21 @@ constexpr float kAtlasOverlap[4] = {0.898f, 0.267f, 0.239f, 1.0f};
 constexpr float kAtlasMarginRatio = 0.92f;
 // Two triangles drawn before everything else, so the grid and the islands have something to sit on.
 constexpr uint32_t kAtlasBackgroundVertices = 6;
+constexpr int kCheckerSide = 512;
+constexpr int kCheckerTile = 64;
+const uint8_t kCheckerLight[3] = {232, 232, 238};
+const uint8_t kCheckerDark[3] = {64, 70, 84};
 
 const char *kVertexShader = R"GLSL(#version 300 es
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec2 aUv;
 uniform mat4 uViewProj;
 out vec3 vNormal;
+out vec2 vUv;
 void main() {
     vNormal = aNormal;
+    vUv = aUv;
     gl_Position = uViewProj * vec4(aPosition, 1.0);
 }
 )GLSL";
@@ -61,9 +70,11 @@ void main() {
 const char *kFragmentShader = R"GLSL(#version 300 es
 precision highp float;
 in vec3 vNormal;
+in vec2 vUv;
 uniform vec4 uColor;
 uniform vec3 uLightDir;
 uniform int uShading;
+uniform sampler2D uTexture;
 layout(location = 0) out vec4 outColor;
 void main() {
     if (uShading == 2) {
@@ -75,9 +86,20 @@ void main() {
         outColor = vec4(normal * 0.5 + 0.5, 1.0);
         return;
     }
+    // The reference grid is lit by nothing: its job is to show where the UVs stretch, and a
+    // shading term would hide the very distortion the user is looking for.
+    if (uShading == 4) {
+        outColor = texture(uTexture, vUv);
+        return;
+    }
     float lit = max(dot(normal, normalize(uLightDir)), 0.0);
     float sky = 0.5 + 0.5 * normal.y;
-    outColor = vec4(uColor.rgb * (0.24 + 0.62 * lit + 0.14 * sky), 1.0);
+    lit = 0.24 + 0.62 * lit + 0.14 * sky;
+    if (uShading == 3) {
+        outColor = vec4(texture(uTexture, vUv).rgb * lit, 1.0);
+        return;
+    }
+    outColor = vec4(uColor.rgb * lit, 1.0);
 }
 )GLSL";
 
@@ -101,6 +123,29 @@ in vec4 vColor;
 layout(location = 0) out vec4 outColor;
 void main() {
     outColor = vColor;
+}
+)GLSL";
+
+// The composed texture as the background of the atlas: the same affine the wireframe uses, so the
+// island lines land exactly on the pixels they belong to.
+const char *kUvTextureVertexShader = R"GLSL(#version 300 es
+layout(location = 0) in vec2 aPosition;
+uniform vec2 uScale;
+uniform vec2 uOffset;
+out vec2 vUv;
+void main() {
+    vUv = aPosition;
+    gl_Position = vec4(aPosition * uScale + uOffset, 0.0, 1.0);
+}
+)GLSL";
+
+const char *kUvTextureFragmentShader = R"GLSL(#version 300 es
+precision mediump float;
+in vec2 vUv;
+uniform sampler2D uTexture;
+layout(location = 0) out vec4 outColor;
+void main() {
+    outColor = texture(uTexture, vUv);
 }
 )GLSL";
 
@@ -230,6 +275,17 @@ bool Renderer::onContextCreated() {
     uvVertexBuffer_ = 0;
     uvUniformScale_ = -1;
     uvUniformOffset_ = -1;
+    uvTextureProgram_ = 0;
+    uvTextureUniformScale_ = -1;
+    uvTextureUniformOffset_ = -1;
+    uvTextureUniformTexture_ = -1;
+    uvTextureVertexArray_ = 0;
+    uvTextureVertexBuffer_ = 0;
+    texture_ = 0;
+    checkerTexture_ = 0;
+    textureRevision_ = 0;
+    hasTexture_ = false;
+    uniformTexture_ = -1;
     uvGridCount_ = 0;
     uvTriCount_ = 0;
     uvEdgeCount_ = 0;
@@ -282,6 +338,47 @@ bool Renderer::buildUvShader() {
     }
     uvUniformScale_ = glGetUniformLocation(uvProgram_, "uScale");
     uvUniformOffset_ = glGetUniformLocation(uvProgram_, "uOffset");
+
+    const GLuint textureVertex = compileShader(GL_VERTEX_SHADER, kUvTextureVertexShader);
+    const GLuint textureFragment = compileShader(GL_FRAGMENT_SHADER, kUvTextureFragmentShader);
+    if (textureVertex == 0 || textureFragment == 0) {
+        if (textureVertex != 0) {
+            glDeleteShader(textureVertex);
+        }
+        if (textureFragment != 0) {
+            glDeleteShader(textureFragment);
+        }
+        return false;
+    }
+    uvTextureProgram_ = glCreateProgram();
+    glAttachShader(uvTextureProgram_, textureVertex);
+    glAttachShader(uvTextureProgram_, textureFragment);
+    glLinkProgram(uvTextureProgram_);
+    glDeleteShader(textureVertex);
+    glDeleteShader(textureFragment);
+    glGetProgramiv(uvTextureProgram_, GL_LINK_STATUS, &ok);
+    if (ok != GL_TRUE) {
+        G3D_LOG_ERROR("atlas picture program link failed");
+        glDeleteProgram(uvTextureProgram_);
+        uvTextureProgram_ = 0;
+        return false;
+    }
+    uvTextureUniformScale_ = glGetUniformLocation(uvTextureProgram_, "uScale");
+    uvTextureUniformOffset_ = glGetUniformLocation(uvTextureProgram_, "uOffset");
+    uvTextureUniformTexture_ = glGetUniformLocation(uvTextureProgram_, "uTexture");
+
+    // The picture is the atlas square itself: two triangles in atlas coordinates, uploaded once
+    // per context because it never changes.
+    const float quad[kAtlasBackgroundVertices * 2] = {0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+                                                      0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f};
+    glGenVertexArrays(1, &uvTextureVertexArray_);
+    glGenBuffers(1, &uvTextureVertexBuffer_);
+    glBindVertexArray(uvTextureVertexArray_);
+    glBindBuffer(GL_ARRAY_BUFFER, uvTextureVertexBuffer_);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(quad)), quad, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
     return true;
 }
 
@@ -319,6 +416,7 @@ bool Renderer::buildShaders() {
     uniformColor_ = glGetUniformLocation(program_, "uColor");
     uniformLightDir_ = glGetUniformLocation(program_, "uLightDir");
     uniformShading_ = glGetUniformLocation(program_, "uShading");
+    uniformTexture_ = glGetUniformLocation(program_, "uTexture");
     return true;
 }
 
@@ -428,6 +526,7 @@ void Renderer::uploadItem(const Mesh &mesh, Item &item) {
         if (mesh.hasUvs()) {
             interleaved[i * 8 + 6] = mesh.uvs[i * 2 + 0];
             interleaved[i * 8 + 7] = mesh.uvs[i * 2 + 1];
+            item.hasUvs = true;
         }
     }
 
@@ -452,8 +551,11 @@ void Renderer::uploadItem(const Mesh &mesh, Item &item) {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), reinterpret_cast<void *>(0));
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
                           reinterpret_cast<void *>(3 * sizeof(float)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
+                          reinterpret_cast<void *>(6 * sizeof(float)));
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
     glBindVertexArray(0);
 }
 
@@ -558,6 +660,82 @@ void Renderer::rectOf(int part, int out[4]) const {
     out[3] = surfaceHeight;
 }
 
+// Composing is CPU work and the compositor already made the picture top-down, the way a PNG stores
+// it; GL reads its first row at v = 0, so the rows are flipped once here and every consumer can
+// sample v straight from the UVs.
+void Renderer::uploadTextureImage(GLuint name, const Image &image) {
+    const size_t stride = static_cast<size_t>(image.width) * 4;
+    uploadScratch_.assign(image.pixels.size(), 0);
+    for (int row = 0; row < image.height; ++row) {
+        std::memcpy(&uploadScratch_[(static_cast<size_t>(image.height - 1 - row)) * stride],
+                    &image.pixels[static_cast<size_t>(row) * stride], stride);
+    }
+    glBindTexture(GL_TEXTURE_2D, name);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.width, image.height, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, uploadScratch_.data());
+    // The atlas has no tiling to repeat and an arbitrary side length, so no mipmaps: GL ES 3 filters
+    // a non-power-of-two texture with the edges clamped, which is exactly the atlas square.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Renderer::refreshTexture() {
+    TextureStudio &studio = TextureStudio::instance();
+    const uint64_t revision = studio.revision();
+    if (revision != textureRevision_) {
+        textureRevision_ = revision;
+        Image picture;
+        hasTexture_ = studio.texture(picture);
+        if (hasTexture_) {
+            if (texture_ == 0) {
+                glGenTextures(1, &texture_);
+            }
+            uploadTextureImage(texture_, picture);
+        }
+    }
+
+    int mode = 0;
+    {
+        std::lock_guard<std::mutex> guard(cameraMutex_);
+        mode = shadingMode_;
+    }
+    if (mode == kShadeChecker && checkerTexture_ == 0) {
+        // The reference grid is the same picture everywhere, so it is built once per context and
+        // repeats: a power of two lets it have mipmaps for the oblique views.
+        Image grid;
+        grid.allocate(kCheckerSide, kCheckerSide, nullptr);
+        fillCheckerboard(grid, kCheckerTile, kCheckerLight, kCheckerDark);
+        glGenTextures(1, &checkerTexture_);
+        uploadTextureImage(checkerTexture_, grid);
+        glBindTexture(GL_TEXTURE_2D, checkerTexture_);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+}
+
+// The composed picture behind the atlas wireframe.
+void Renderer::drawUvBackground(const float affine[4]) {
+    if (uvTextureProgram_ == 0 || texture_ == 0) {
+        return;
+    }
+    glUseProgram(uvTextureProgram_);
+    glUniform2f(uvTextureUniformScale_, affine[0], affine[1]);
+    glUniform2f(uvTextureUniformOffset_, affine[2], affine[3]);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture_);
+    glUniform1i(uvTextureUniformTexture_, 0);
+    glBindVertexArray(uvTextureVertexArray_);
+    glDrawArrays(GL_TRIANGLES, 0, kAtlasBackgroundVertices);
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 void Renderer::draw() {
     if (!contextReady_) {
         return;
@@ -572,16 +750,34 @@ void Renderer::draw() {
         surfaceHeight = height_;
     }
 
+    // The compositor and the atlas live on their own schedule: the picture has to be re-uploaded
+    // even when the 3D rectangle is hidden, or the atlas would show yesterday's texture.
+    refreshTexture();
+
     int three[4];
     rectOf(0, three);
     if (three[2] > 0 && !items_.empty()) {
         // GL viewports are measured from the bottom left, the surface rectangles are not.
         glViewport(three[0], surfaceHeight - three[1] - three[3], three[2], three[3]);
         const glm::mat4 matrix = this->viewProjection(three[2], three[3]);
+        int shading = kShadeSolid;
+        {
+            std::lock_guard<std::mutex> guard(cameraMutex_);
+            shading = shadingMode_;
+        }
+
         glUseProgram(program_);
         glUniformMatrix4fv(uniformViewProj_, 1, GL_FALSE, &matrix[0][0]);
         glUniform3f(uniformLightDir_, 0.35f, 0.85f, 0.4f);
-        glUniform1i(uniformShading_, shadingMode_);
+        glUniform1i(uniformShading_, shading);
+        // The grid repeats over the whole UV square, the atlas picture does not: one sampler,
+        // whichever texture the mode asked for.
+        const GLuint bound = shading == kShadeChecker ? checkerTexture_ : texture_;
+        if (bound != 0) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, bound);
+            glUniform1i(uniformTexture_, 0);
+        }
 
         // Push the triangles a little away from the camera so the selection outline, which sits on
         // the very same edges, wins the depth test instead of flickering against it.
@@ -590,10 +786,15 @@ void Renderer::draw() {
         for (Item &item : items_) {
             glBindVertexArray(item.vertexArray);
             glUniform4f(uniformColor_, item.color[0], item.color[1], item.color[2], item.color[3]);
+            // A mesh the user never gave UVs to cannot show a texture: it keeps the shaded
+            // material instead of sampling the atlas corner for every pixel of it.
+            const bool needsUvs = shading == kShadeTextured || shading == kShadeChecker;
+            glUniform1i(uniformShading_, needsUvs && !item.hasUvs ? kShadeSolid : shading);
             glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(item.indexCount), GL_UNSIGNED_INT,
                            reinterpret_cast<const void *>(0));
         }
         glDisable(GL_POLYGON_OFFSET_FILL);
+        glBindTexture(GL_TEXTURE_2D, 0);
 
         // Read every frame so a tap in the hierarchy panel highlights without re-uploading.
         const int selected = Document::instance().selected();
@@ -724,7 +925,22 @@ int Renderer::pickAt(float xPixels, float yPixels) {
     return best;
 }
 
-void Renderer::setShadingMode(int mode) { shadingMode_ = mode == 1 ? 1 : 0; }
+void Renderer::setShadingMode(int mode) {
+    std::lock_guard<std::mutex> guard(cameraMutex_);
+    shadingMode_ = (mode == kShadeNormals || mode == kShadeTextured || mode == kShadeChecker)
+                       ? mode
+                       : kShadeSolid;
+}
+
+void Renderer::setUvOverlayVisible(bool visible) {
+    std::lock_guard<std::mutex> guard(cameraMutex_);
+    uvOverlayVisible_ = visible;
+}
+
+bool Renderer::uvOverlayVisible() const {
+    std::lock_guard<std::mutex> guard(cameraMutex_);
+    return uvOverlayVisible_;
+}
 
 void Renderer::setViewMode(int mode) {
     std::lock_guard<std::mutex> guard(cameraMutex_);
@@ -965,29 +1181,35 @@ void Renderer::drawUv() {
         return;
     }
     rebuildUvGeometry();
-    if (uvGridCount_ == 0 && uvTriCount_ == 0 && uvEdgeCount_ == 0) {
-        return;
-    }
-
     float affine[4];
     uvAffine(rect, affine);
-    glUseProgram(uvProgram_);
-    glUniform2f(uvUniformScale_, affine[0], affine[1]);
-    glUniform2f(uvUniformOffset_, affine[2], affine[3]);
 
     // The atlas is flat: no depth, and the island fills blend so overlaps pile up visibly.
     glDisable(GL_DEPTH_TEST);
+    drawUvBackground(affine);
+
+    glUseProgram(uvProgram_);
+    glUniform2f(uvUniformScale_, affine[0], affine[1]);
+    glUniform2f(uvUniformOffset_, affine[2], affine[3]);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBindVertexArray(uvVertexArray_);
+
+    // Where the composed picture exists it already covers the square; without one the atlas still
+    // has to read as a square.
     uint32_t first = 0;
-    glDrawArrays(GL_TRIANGLES, static_cast<GLint>(first), kAtlasBackgroundVertices);
+    if (!hasTexture_) {
+        glDrawArrays(GL_TRIANGLES, static_cast<GLint>(first), kAtlasBackgroundVertices);
+    }
     first += kAtlasBackgroundVertices;
-    glDrawArrays(GL_LINES, static_cast<GLint>(first), static_cast<GLsizei>(uvGridCount_));
-    first += uvGridCount_;
-    glDrawArrays(GL_TRIANGLES, static_cast<GLint>(first), static_cast<GLsizei>(uvTriCount_));
-    first += uvTriCount_;
-    glDrawArrays(GL_LINES, static_cast<GLint>(first), static_cast<GLsizei>(uvEdgeCount_));
+    if (uvOverlayVisible()) {
+        glDrawArrays(GL_LINES, static_cast<GLint>(first), static_cast<GLsizei>(uvGridCount_));
+        first += uvGridCount_;
+        glDrawArrays(GL_TRIANGLES, static_cast<GLint>(first),
+                     static_cast<GLsizei>(uvTriCount_));
+        first += uvTriCount_;
+        glDrawArrays(GL_LINES, static_cast<GLint>(first), static_cast<GLsizei>(uvEdgeCount_));
+    }
     glBindVertexArray(0);
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);

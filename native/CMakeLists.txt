@@ -34,6 +34,7 @@ set(G3D_CORE_SOURCES
     core/uv_islands.cpp
     texture/g3d_image.cpp
     texture/texture_layer.cpp
+    texture/texture_studio.cpp
     ${G3D_STB_IMPL}
     importers/assimp_importer.cpp
     uv/uv_service.cpp

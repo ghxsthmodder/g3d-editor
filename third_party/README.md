@@ -43,9 +43,14 @@ licença e os arquivos mantidos.
 - Licença: escolha entre MIT e Unlicense (arquivo `LICENSE` com as duas).
 - Arquivos mantidos: `stb_image.h`, `stb_image_write.h`, `LICENSE`.
 - Redimensionamento: `stb_image_resize2.h` foi movido para `deprecated/` no upstream e por isso
-  **não** foi incorporado; se a composição precisar de resize, a alternativa será decidida na
-  Fase 4.
-- Estado: ainda não compilado no app (uso previsto na Fase 4).
+  **não** foi incorporado; a composição remostra cada camada pela transformada inversa, sem
+  redimensionar o arquivo de origem.
+- Compilação: as implementações ficam em uma única unidade (`native/texture/stb_impl.cpp`), com
+  avisos desativados (`-w`) porque o stb é código C que alerta sob `-Wextra`; o resto do núcleo
+  usa apenas as declarações dos cabeçalhos via `native/texture/g3d_image.cpp`.
+- Estado: em uso desde a Fase 4 (importação de imagens e exportação PNG do compositor).
+- Tamanho adicionado: a unidade de implementação do stb mede 263 KB como objeto de host em Release
+  (x86-64, com símbolos); a contribuição no `.so` do APK ainda não foi medida.
 
 ## GLM
 

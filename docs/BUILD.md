@@ -48,7 +48,7 @@ não é necessário.
 bash native/tests/run_host_test.sh
 ```
 
-O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os cinco testes via
+O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os seis testes via
 CTest (nenhum deles faz parte do APK):
 
 | Teste | Executável | O que verifica |
@@ -57,6 +57,7 @@ CTest (nenhum deles faz parte do APK):
 | `import_test` | `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento |
 | `uv_islands_test` | `host_uv_test` | agrupamento de UVs em ilhas e conectividade |
 | `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, validar, aplicar/cancelar |
+| `image_test` | `host_image_test` | decodificação PNG/JPEG (stb), ida e volta sem perdas do PNG, paleta com transparência, limite de pixels e quadriculado de referência |
 | `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer, incluindo a vista 2D do atlas |
 
 `render_test` só é construído quando o host tem EGL + OpenGL ES 3 (`libegl-dev`,
@@ -65,6 +66,11 @@ disponível, imprime `SKIP` e sai com sucesso. Com `G3D_RENDER_PREVIEW=/tmp/look
 PPM para inspecionar a imagem sem telefone: `look.solido.ppm`, `look.normais.ppm`,
 `look.selecao.ppm`, `look.atlas.ppm` (sobreposições em vermelho), `look.ilha.ppm` (ilha selecionada
 em âmbar), `look.repack.ppm`, `look.so_atlas.ppm` e `look.vazio.ppm`.
+
+As fixtures de imagem usadas pelo `image_test` estão em `native/tests/models`: `gradient.jpg`
+(64×64, JPEG *baseline* — o stb recusa JPEG progressivo), `palette.png` (32×32 em paleta com um
+índice transparente) e `oversized.png`, que são só os cabeçalhos PNG declarando 9000×9000 px e
+serve para provar que o orçamento de pixels recusa a imagem antes de alocá-la.
 
 ## Estrutura
 

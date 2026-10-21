@@ -23,6 +23,7 @@ set(ASSIMP_INJECT_DEBUG_POSTFIX OFF CACHE BOOL "" FORCE)
 add_subdirectory(${G3D_THIRD_PARTY}/assimp ${CMAKE_BINARY_DIR}/_assimp EXCLUDE_FROM_ALL)
 
 set(G3D_XATLAS ${G3D_THIRD_PARTY}/xatlas/xatlas.cpp)
+set(G3D_STB_IMPL texture/stb_impl.cpp)
 
 set(G3D_CORE_SOURCES
     core/mesh.cpp
@@ -31,6 +32,8 @@ set(G3D_CORE_SOURCES
     core/scene.cpp
     core/document.cpp
     core/uv_islands.cpp
+    texture/g3d_image.cpp
+    ${G3D_STB_IMPL}
     importers/assimp_importer.cpp
     uv/uv_service.cpp
     uv/uv_edit.cpp
@@ -47,6 +50,7 @@ set(G3D_INCLUDES
 )
 
 set_source_files_properties(${G3D_XATLAS} PROPERTIES COMPILE_OPTIONS "-w")
+set_source_files_properties(${G3D_STB_IMPL} PROPERTIES COMPILE_OPTIONS "-w")
 
 if (ANDROID)
     # The APK target: core + OpenGL ES renderer + JNI bridge.
@@ -92,6 +96,12 @@ else()
     target_compile_definitions(host_uv_edit_test
         PRIVATE G3D_TEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/models")
     add_test(NAME uv_edit_test COMMAND host_uv_edit_test)
+
+    add_executable(host_image_test tests/host_image_test.cpp)
+    target_link_libraries(host_image_test PRIVATE g3dcore)
+    target_compile_definitions(host_image_test
+        PRIVATE G3D_TEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/models")
+    add_test(NAME image_test COMMAND host_image_test)
 
     # Headless GL test of the renderer. Only built when the host has EGL and OpenGL ES 3.
     find_library(G3D_EGL_LIBRARY EGL)

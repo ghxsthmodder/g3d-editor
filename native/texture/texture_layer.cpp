@@ -99,11 +99,42 @@ const TextureLayer *TextureComposition::layer(int id) const {
 }
 
 size_t TextureComposition::memoryBytes() const {
+    // The distinct pictures, not the sum over the layers: a duplicated layer paints the same buffer
+    // twice and an undo step keeps a stack without keeping its bytes again, so counting per layer
+    // would tell the panel about memory the phone is not holding.
+    std::vector<const Image *> seen;
     size_t bytes = 0;
     for (const TextureLayer &layer : layers_) {
-        bytes += layer.image.memoryBytes();
+        if (!layer.image) {
+            continue;
+        }
+        if (std::find(seen.begin(), seen.end(), layer.image.get()) != seen.end()) {
+            continue;
+        }
+        seen.push_back(layer.image.get());
+        bytes += layer.image->memoryBytes();
     }
     return bytes;
+}
+
+TextureState TextureComposition::state() const {
+    TextureState state;
+    state.canvasWidth = canvasWidth_;
+    state.canvasHeight = canvasHeight_;
+    state.background[0] = background_[0];
+    state.background[1] = background_[1];
+    state.background[2] = background_[2];
+    state.layers = layers_;
+    return state;
+}
+
+void TextureComposition::setState(const TextureState &state) {
+    canvasWidth_ = state.canvasWidth;
+    canvasHeight_ = state.canvasHeight;
+    background_[0] = state.background[0];
+    background_[1] = state.background[1];
+    background_[2] = state.background[2];
+    layers_ = state.layers;
 }
 
 int TextureComposition::addLayer(const Image &image, std::string &error) {
@@ -127,7 +158,9 @@ int TextureComposition::addLayer(const Image &image, std::string &error) {
     TextureLayer layer;
     layer.id = nextId_++;
     layer.name = image.name.empty() ? "camada " + std::to_string(layer.id) : image.name;
-    layer.image = image;
+    // The one place a picture is copied into the stack: what an import decoded is handed over here
+    // and shared from then on.
+    layer.image = std::make_shared<const Image>(image);
     layer.centreX = canvasWidth_ * 0.5f;
     layer.centreY = canvasHeight_ * 0.5f;
     layers_.push_back(std::move(layer));
@@ -168,29 +201,18 @@ bool TextureComposition::duplicateLayer(int id, int &newId, std::string &error) 
     if (source == nullptr) {
         return false;
     }
-    // addLayer may move the whole vector, so the placement is read out of it first.
-    const std::string name = source->name;
-    const float centreX = source->centreX;
-    const float centreY = source->centreY;
-    const float rotationDegrees = source->rotationDegrees;
-    const float scaleX = source->scaleX;
-    const float scaleY = source->scaleY;
-    const float opacity = source->opacity;
-    const bool visible = source->visible;
-
-    newId = addLayer(source->image, error);
-    if (newId < 0) {
+    if (layers_.size() >= kMaxLayers) {
+        error = "o compositor não aceita mais que " + std::to_string(kMaxLayers) + " camadas";
         return false;
     }
-    TextureLayer *copy = find(newId);
-    copy->name = name + " (cópia)";
-    copy->centreX = centreX;
-    copy->centreY = centreY;
-    copy->rotationDegrees = rotationDegrees;
-    copy->scaleX = scaleX;
-    copy->scaleY = scaleY;
-    copy->opacity = opacity;
-    copy->visible = visible;
+    // A copy is the same picture with its own placement, so it is built here instead of through
+    // addLayer: nothing is decoded, nothing is copied and the budget of bytes is not charged twice
+    // for one buffer.
+    TextureLayer copy = *source;
+    copy.id = nextId_++;
+    copy.name = source->name + " (cópia)";
+    layers_.push_back(std::move(copy));
+    newId = layers_.back().id;
     return true;
 }
 
@@ -283,7 +305,7 @@ bool TextureComposition::compose(Image &out, std::string &error) const {
     }
 
     for (const TextureLayer &layer : layers_) {
-        if (!layer.visible || layer.opacity <= 0.0f || !layer.image.valid() ||
+        if (!layer.visible || layer.opacity <= 0.0f || !layer.image || !layer.image->valid() ||
             layer.scaleX <= 0.0f || layer.scaleY <= 0.0f) {
             continue;
         }
@@ -291,8 +313,8 @@ bool TextureComposition::compose(Image &out, std::string &error) const {
         const float radians = layer.rotationDegrees * 0.017453292519943295f;
         const float cosine = std::cos(radians);
         const float sine = std::sin(radians);
-        const float halfWidth = (layer.image.width - 1) * 0.5f * layer.scaleX;
-        const float halfHeight = (layer.image.height - 1) * 0.5f * layer.scaleY;
+        const float halfWidth = (layer.image->width - 1) * 0.5f * layer.scaleX;
+        const float halfHeight = (layer.image->height - 1) * 0.5f * layer.scaleY;
 
         // The rotated corners bound the pixels the layer can touch; a small decal does not pay a
         // pass over the whole canvas.
@@ -315,8 +337,8 @@ bool TextureComposition::compose(Image &out, std::string &error) const {
         const int firstY = std::max(0, static_cast<int>(std::floor(minimumY)));
         const int lastY = std::min(out.height - 1, static_cast<int>(std::ceil(maximumY)));
 
-        const float centreSourceX = (layer.image.width - 1) * 0.5f;
-        const float centreSourceY = (layer.image.height - 1) * 0.5f;
+        const float centreSourceX = (layer.image->width - 1) * 0.5f;
+        const float centreSourceY = (layer.image->height - 1) * 0.5f;
         const float opacity = layer.opacity;
 
         for (int y = firstY; y <= lastY; ++y) {
@@ -330,7 +352,7 @@ bool TextureComposition::compose(Image &out, std::string &error) const {
                 const float sourceY = centreSourceY + rotatedY / layer.scaleY;
 
                 float source[4];
-                if (!sampleBilinear(layer.image, sourceX, sourceY, source)) {
+                if (!sampleBilinear(*layer.image, sourceX, sourceY, source)) {
                     continue;
                 }
                 const float alpha = source[3] / 255.0f * opacity;

@@ -195,15 +195,17 @@ JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeSceneInfo(JNIEnv *env
 
 /**
  * What the editor holds, in bytes, counted by part: the file the model came in with, the geometry
- * built out of it, the compositor with its composed picture, and the open UV session with its
- * history. Numbers rather than a sentence, because the panel decides the words.
+ * built out of it, the compositor with its composed picture, the open UV session and the pictures
+ * the document history keeps after a layer leaves the canvas. Numbers rather than a sentence,
+ * because the panel decides the words.
  */
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeMemoryInfo(JNIEnv *env, jclass) {
     std::ostringstream stream;
     stream << "source=" << g3d::Document::instance().sourceBytes()
            << " meshes=" << g3d::Document::instance().meshBytes()
            << " layers=" << g3d::TextureStudio::instance().memoryBytes()
-           << " edit=" << g3d::UvEditor::instance().memoryBytes();
+           << " edit=" << g3d::UvEditor::instance().memoryBytes()
+           << " history=" << g3d::TextureStudio::instance().historyBytes();
     return toJString(env, stream.str());
 }
 
@@ -664,6 +666,17 @@ JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureRotate(JNIEnv
 JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureScale(JNIEnv *, jclass, jint id,
                                                                          jfloat factor) {
     return g3d::TextureStudio::instance().scaleBy(id, factor) ? JNI_TRUE : JNI_FALSE;
+}
+
+// The document history of the compositor, told apart from the history of the open UV session: the
+// first remembers layers and resolutions, the second remembers the shape of the islands. A press
+// that returns false ran out of steps, which is not an error and is not a no-op either.
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureUndo(JNIEnv *, jclass) {
+    return g3d::TextureStudio::instance().undo() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureRedo(JNIEnv *, jclass) {
+    return g3d::TextureStudio::instance().redo() ? JNI_TRUE : JNI_FALSE;
 }
 
 // The exported file is the exact picture the preview uploads, straight out of the compositor: no

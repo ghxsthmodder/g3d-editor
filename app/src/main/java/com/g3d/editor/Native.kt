@@ -167,6 +167,15 @@ object Native {
 
     external fun nativeTextureScale(id: Int, factor: Float): Boolean
 
+    /**
+     * Steps back and forth over the document of the compositor: a resolution, an import, a removal,
+     * a nudge. A step remembers the stack, not the pixels, so undoing an import brings the picture
+     * back without reading the file again. False means the branch is empty.
+     */
+    external fun nativeTextureUndo(): Boolean
+
+    external fun nativeTextureRedo(): Boolean
+
     external fun nativeTexturePng(): ByteArray?
 
     /**

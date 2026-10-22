@@ -917,6 +917,36 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical" />
 
+                    <!-- The document undo, next to the stack it walks through rather than under
+                         "Camada selecionada": undoing an import works with no layer chosen, and one
+                         press covers the whole compositor, resolution included. -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/textureUndo"
+                            style="@style/ToolButton.Outlined"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/texture_undo"
+                            app:icon="@drawable/ic_undo"
+                            app:iconGravity="textStart" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/textureRedo"
+                            style="@style/ToolButton.Outlined"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:text="@string/texture_redo"
+                            app:icon="@drawable/ic_redo"
+                            app:iconGravity="textStart" />
+                    </LinearLayout>
+
                     <TextView
                         style="@style/Widget.G3D.SectionLabel"
                         android:text="@string/texture_tools_title" />

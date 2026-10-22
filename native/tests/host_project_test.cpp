@@ -195,8 +195,8 @@ void testSaveAndOpen() {
         check(std::fabs(layers[1].scaleX - 1.5f) < 0.01f, "a escala da camada volta");
         check(std::fabs(layers[1].opacity - 0.4f) < 0.01f, "a opacidade da camada volta");
         check(!layers[0].visible, "a camada escondida volta escondida");
-        check(layers[0].image.width == 32 && layers[0].image.pixels ==
-                  solid(32, 32, 255, 0, 0, 255, "vermelho.png").pixels,
+        check(layers[0].image && layers[0].image->width == 32 &&
+                  layers[0].image->pixels == solid(32, 32, 255, 0, 0, 255, "vermelho.png").pixels,
               "a imagem da camada volta byte a byte");
     }
 

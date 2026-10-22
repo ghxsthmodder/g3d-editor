@@ -322,6 +322,116 @@ void testMemoryAccounting() {
     studio.setDeviceLimit(0);
 }
 
+// The undo of the compositor is the whole document: canvas, background and stack. A step shares the
+// pictures instead of copying them, so removing a layer and undoing it costs no pixels, and the
+// history only holds bytes the canvas no longer shows.
+void testUndoRedo() {
+    g3d::TextureStudio &studio = g3d::TextureStudio::instance();
+    std::string error;
+    studio.reset();
+    check(!studio.canUndo() && !studio.canRedo(), "um estúdio novo não tem o que desfazer");
+    check(!studio.undo() && !studio.redo(), "desfazer sem história não faz nada");
+
+    check(studio.setCanvas(64, 64, error), "a tela entra");
+    check(studio.undo(), "a resolução da tela é um passo");
+    check(studio.canvasWidth() == 0, "desfazer leva a tela embora");
+    check(studio.redo(), "e o refazer a traz de volta");
+    check(studio.canvasWidth() == 64, "a tela volta com o refazer");
+
+    const int first = studio.addLayer(solid(8, 8, 200, 30, 30, 255, "vermelho.png"), error);
+    const int second = studio.addLayer(solid(8, 8, 30, 200, 30, 255, "verde.png"), error);
+    const int third = studio.addLayer(solid(8, 8, 30, 30, 200, 255, "azul.png"), error);
+    check(first > 0 && second > 0 && third > 0, "três camadas entram");
+    const uint8_t tint[3] = {0x12, 0x34, 0x56};
+    studio.setBackground(tint);
+    studio.translate(second, 8.0f, -4.0f);
+    check(studio.layerCount() == 3, "a pilha tem três camadas");
+    uint8_t back[3] = {0, 0, 0};
+    studio.background(back);
+    check(back[0] == 0x12 && back[2] == 0x56, "o fundo mudou");
+
+    studio.removeLayer(third);
+    check(studio.layerCount() == 2, "remover deixou duas camadas");
+    check(studio.undo(), "desfazer a remoção");
+    check(studio.layerCount() == 3, "a camada removida volta");
+    check(studio.canRedo(), "e o passo tem refazer");
+    check(studio.undo(), "desfazer o arrasto");
+    check(studio.undo(), "desfazer o fundo");
+    check(studio.undo(), "desfazer a camada azul");
+    check(studio.layerCount() == 2, "quatro passos atrás ficam a vermelha e a verde");
+    check(std::fabs(studio.layers()[1].centreX - 32.0f) < 0.01f, "a do topo volta ao centro");
+    studio.background(back);
+    check(back[0] != 0x12, "e o fundo volta ao que era");
+    check(studio.undo(), "desfazer a verde");
+    check(studio.layerCount() == 1, "sobrou a primeira camada");
+    check(studio.undo(), "desfazer a vermelha");
+    check(studio.layerCount() == 0, "e a pilha fica vazia, com a tela ainda de pé");
+    for (int step = 0; step < 6; ++step) {
+        check(studio.redo(), "refazer os seis passos anda pra frente");
+    }
+    check(studio.layerCount() == 2, "o documento volta ao que estava antes do primeiro desfazer");
+    check(std::fabs(studio.layers()[1].centreX - 40.0f) < 0.01f, "o arrasto volta com o refazer");
+    check(!studio.canRedo(), "refazer até o fim não deixa nada à frente");
+
+    // The history is a window, not a trail: a new mutation drops the redo branch.
+    check(studio.undo(), "um passo para trás");
+    check(studio.canRedo(), "que deixou refazer");
+    studio.setOpacity(first, 0.5f);
+    check(!studio.canRedo(), "editar depois de desfazer fecha o refazer");
+
+    // A picture the canvas still shows is not a cost of the history; a layer removed and undone is
+    // the same buffer all the way through.
+    studio.reset();
+    check(studio.setCanvas(64, 64, error), "a tela do histórico");
+    const int kept = studio.addLayer(solid(8, 8, 200, 30, 30, 255, "queda.png"), error);
+    check(studio.historyBytes() == 0, "uma camada na tela não é bytes de histórico");
+    studio.removeLayer(kept);
+    check(studio.historyBytes() == 8u * 8 * 4, "a camada que saiu da tela fica no histórico");
+    studio.undo();
+    check(studio.historyBytes() == 0, "de volta à tela, o histórico não paga por ela");
+    check(studio.memoryBytes() == 8u * 8 * 4, "e a pilha continua com uma imagem de 8x8");
+
+    // Duplicating is the same buffer painted twice: neither the stack nor the history pays again.
+    int copy = 0;
+    check(studio.duplicateLayer(kept, copy, error) && copy > 0, "a camada é duplicada");
+    check(studio.memoryBytes() == 8u * 8 * 4, "a cópia não soma bytes à pilha");
+    check(studio.historyBytes() == 0, "a cópia não soma bytes ao histórico");
+    check(studio.layers()[0].image.get() == studio.layers()[1].image.get(),
+          "as duas camadas apontam para a mesma imagem");
+    check(studio.undo() && studio.layerCount() == 1, "desfazer tira a cópia");
+    check(studio.canRedo(), "a cópia pode ser refeita");
+    studio.clearHistory();
+    check(!studio.canUndo() && !studio.canRedo(), "esquecer a história fecha o documento");
+    studio.reset();
+}
+
+// A long session on a phone cannot be allowed to keep every picture it touched. The window has a
+// ceiling, and what goes over it is the oldest step: the user is undoing what they just did.
+void testHistoryWindow() {
+    g3d::TextureStudio &studio = g3d::TextureStudio::instance();
+    std::string error;
+    studio.reset();
+    check(studio.setCanvas(64, 64, error), "a tela da janela");
+    const int layer = studio.addLayer(solid(8, 8, 200, 30, 30, 255, "janela.png"), error);
+    int steps = 0;
+    for (int nudge = 0; nudge < 200; ++nudge) {
+        if (!studio.translate(layer, 0.1f, 0.0f)) {
+            break;
+        }
+        ++steps;
+    }
+    check(steps == 200, "duzentos arrastos passam: " + std::to_string(steps));
+    int undone = 0;
+    while (undone < 300 && studio.undo()) {
+        ++undone;
+    }
+    check(undone <= 64, "o histórico tem teto de 64 passos, desfeitos=" + std::to_string(undone));
+    check(undone > 1, "e ainda desfaz o que foi feito por último");
+    check(studio.canvasWidth() == 64, "o passo sacrificado é o mais antigo, não a tela");
+    check(studio.layerCount() == 1, "a camada continua onde o primeiro passo restante a deixou");
+    studio.reset();
+}
+
 // The panel of the phone parses the two strings below, so their shape is part of the contract
 // between the native stack and the Kotlin side and not a free-form debug print.
 void testStudioText() {
@@ -376,6 +486,8 @@ int main() {
     testLayerBudget();
     testCanvasCeilings();
     testMemoryAccounting();
+    testUndoRedo();
+    testHistoryWindow();
     testStudioText();
     std::printf("%d checagens, %d falhas\n", checks, failures);
     return failures == 0 ? 0 : 1;

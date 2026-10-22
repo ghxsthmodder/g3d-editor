@@ -120,6 +120,8 @@
     <string name="texture_background_default">2E323C</string>
     <string name="texture_background_apply">Fundo</string>
     <string name="texture_stack_title">Pilha</string>
+    <string name="texture_undo">Desfazer</string>
+    <string name="texture_redo">Refazer</string>
     <string name="texture_tools_title">Camada selecionada</string>
     <string name="texture_duplicate">Duplicar</string>
     <string name="texture_remove">Remover</string>
@@ -134,6 +136,8 @@
     <string name="status_texture_import_failed">não foi possível usar %1$s: %2$s</string>
     <string name="status_texture_unsupported_image">imagem em .%1$s não suportada nesta versão (use .png, .jpg ou .jpeg)</string>
     <string name="status_texture_no_layer">nenhuma camada selecionada — toque em uma da pilha</string>
+    <string name="status_texture_no_undo">nada para desfazer neste documento</string>
+    <string name="status_texture_no_redo">nada para refazer neste documento</string>
     <string name="status_texture_noop">%1$s não fez nada: a camada saiu da pilha</string>
     <string name="status_texture_canvas">tela da textura em %1$d × %2$d px</string>
     <string name="status_texture_canvas_failed">a tela não foi aceita: %1$s</string>
@@ -170,7 +174,7 @@
     <string name="uv_report_title">geração de UV do cubo de teste:</string>
 
     <!-- Os números vêm do núcleo em bytes; estas palavras são o que o painel mostra. -->
-    <string name="memory_line">memória retida: %1$s MB (arquivo %2$s · malhas %3$s · camadas %4$s · edição %5$s)</string>
+    <string name="memory_line">memória retida: %1$s MB (arquivo %2$s · malhas %3$s · camadas %4$s · edição %5$s · histórico %6$s)</string>
     <string name="memory_empty">memória retida: 0 MB</string>
     <string name="status_interrupted_stage">a sessão anterior parou em: %1$s</string>
 </resources>

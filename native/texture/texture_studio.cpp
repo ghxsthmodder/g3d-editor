@@ -1,9 +1,57 @@
 #include "texture/texture_studio.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <sstream>
 
 namespace g3d {
+namespace {
+
+// The undo window of the compositor. A step is the canvas, the colour behind it and the placements,
+// so the number of steps is cheap and what really costs is the picture a dropped step was the last
+// to hold. The bytes are half of what the stack itself may reach: a phone carries the model, the
+// atlas and this window at the same time, and the newest step is never the one dropped.
+constexpr size_t kMaxHistorySteps = 64;
+constexpr size_t kMaxHistoryBytes = 32u * 1024u * 1024u;
+
+// What forgetting both stacks would give back in pixels. A picture the stack on the canvas still
+// shows is not freed by dropping a step, and one several steps share is only freed by the last of
+// them, so every buffer counts once and only when nothing live reaches it. The handful of numbers a
+// step itself is costs nothing worth naming.
+size_t historyCost(const std::vector<TextureState> &undoStack,
+                   const std::vector<TextureState> &redoStack,
+                   const std::vector<TextureLayer> &live) {
+    std::vector<const Image *> held;
+    held.reserve(live.size());
+    for (const TextureLayer &layer : live) {
+        if (layer.image) {
+            held.push_back(layer.image.get());
+        }
+    }
+    std::vector<const Image *> counted;
+    size_t bytes = 0;
+    for (const std::vector<TextureState> *stack : {&undoStack, &redoStack}) {
+        for (const TextureState &step : *stack) {
+            for (const TextureLayer &layer : step.layers) {
+                if (!layer.image) {
+                    continue;
+                }
+                const Image *picture = layer.image.get();
+                if (std::find(held.begin(), held.end(), picture) != held.end()) {
+                    continue;
+                }
+                if (std::find(counted.begin(), counted.end(), picture) != counted.end()) {
+                    continue;
+                }
+                counted.push_back(picture);
+                bytes += picture->memoryBytes();
+            }
+        }
+    }
+    return bytes;
+}
+
+}  // namespace
 
 TextureStudio &TextureStudio::instance() {
     static TextureStudio studio;
@@ -17,9 +65,11 @@ void TextureStudio::touch() {
 
 bool TextureStudio::setCanvas(int width, int height, std::string &error) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     if (!composition_.setCanvas(width, height, error)) {
         return false;
     }
+    remember(before);
     touch();
     return true;
 }
@@ -46,7 +96,9 @@ int TextureStudio::canvasHeight() const {
 
 void TextureStudio::setBackground(const uint8_t rgb[3]) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     composition_.setBackground(rgb);
+    remember(before);
     touch();
 }
 
@@ -57,8 +109,10 @@ void TextureStudio::background(uint8_t out[3]) const {
 
 int TextureStudio::addLayer(const Image &image, std::string &error) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     const int id = composition_.addLayer(image, error);
     if (id > 0) {
+        remember(before);
         touch();
     }
     return id;
@@ -66,8 +120,10 @@ int TextureStudio::addLayer(const Image &image, std::string &error) {
 
 int TextureStudio::addLayerAt(const Image &image, const TextureLayer &at, std::string &error) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     const int id = composition_.addLayerAt(image, at, error);
     if (id > 0) {
+        remember(before);
         touch();
     }
     return id;
@@ -80,81 +136,99 @@ std::vector<TextureLayer> TextureStudio::layers() const {
 
 bool TextureStudio::removeLayer(int id) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     if (!composition_.removeLayer(id)) {
         return false;
     }
+    remember(before);
     touch();
     return true;
 }
 
 bool TextureStudio::duplicateLayer(int id, int &newId, std::string &error) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     if (!composition_.duplicateLayer(id, newId, error)) {
         return false;
     }
+    remember(before);
     touch();
     return true;
 }
 
 bool TextureStudio::moveUp(int id) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     if (!composition_.moveUp(id)) {
         return false;
     }
+    remember(before);
     touch();
     return true;
 }
 
 bool TextureStudio::moveDown(int id) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     if (!composition_.moveDown(id)) {
         return false;
     }
+    remember(before);
     touch();
     return true;
 }
 
 bool TextureStudio::setVisible(int id, bool visible) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     if (!composition_.setVisible(id, visible)) {
         return false;
     }
+    remember(before);
     touch();
     return true;
 }
 
 bool TextureStudio::setOpacity(int id, float opacity) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     if (!composition_.setOpacity(id, opacity)) {
         return false;
     }
+    remember(before);
     touch();
     return true;
 }
 
 bool TextureStudio::translate(int id, float dxPixels, float dyPixels) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     if (!composition_.translate(id, dxPixels, dyPixels)) {
         return false;
     }
+    remember(before);
     touch();
     return true;
 }
 
 bool TextureStudio::rotate(int id, float degreesDelta) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     if (!composition_.rotate(id, degreesDelta)) {
         return false;
     }
+    remember(before);
     touch();
     return true;
 }
 
 bool TextureStudio::scaleBy(int id, float factor) {
     std::lock_guard<std::mutex> guard(mutex_);
+    const TextureState before = composition_.state();
     if (!composition_.scaleBy(id, factor)) {
         return false;
     }
+    remember(before);
     touch();
     return true;
 }
@@ -168,6 +242,62 @@ size_t TextureStudio::memoryBytes() const {
     std::lock_guard<std::mutex> guard(mutex_);
     // The composed picture is the one buffer nobody sees in the layer list, and it is canvas sized.
     return composition_.memoryBytes() + composed_.memoryBytes();
+}
+
+void TextureStudio::remember(const TextureState &before) {
+    undo_.push_back(before);
+    trim(undo_);
+    redo_.clear();
+}
+
+void TextureStudio::trim(std::vector<TextureState> &stack) const {
+    // The oldest step is always kept, even when one picture is bigger than the window: undoing the
+    // last click is worth more than an empty history, and dropping the newest would come to the
+    // same thing.
+    while (stack.size() > 1 &&
+           (stack.size() > kMaxHistorySteps ||
+            historyCost(undo_, redo_, composition_.layers()) > kMaxHistoryBytes)) {
+        stack.erase(stack.begin());
+    }
+}
+
+bool TextureStudio::undo() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    if (undo_.empty()) {
+        return false;
+    }
+    TextureState back = std::move(undo_.back());
+    undo_.pop_back();
+    redo_.push_back(composition_.state());
+    trim(redo_);
+    composition_.setState(back);
+    touch();
+    return true;
+}
+
+bool TextureStudio::redo() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    if (redo_.empty()) {
+        return false;
+    }
+    TextureState forward = std::move(redo_.back());
+    redo_.pop_back();
+    undo_.push_back(composition_.state());
+    trim(undo_);
+    composition_.setState(forward);
+    touch();
+    return true;
+}
+
+void TextureStudio::clearHistory() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    undo_.clear();
+    redo_.clear();
+}
+
+size_t TextureStudio::historyBytes() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return historyCost(undo_, redo_, composition_.layers());
 }
 
 bool TextureStudio::renderLocked(Image &out, std::string &error) {
@@ -250,6 +380,10 @@ void TextureStudio::reset() {
     composed_.clear();
     dirty_ = true;
     ++revision_;
+    // Another document is not the previous one's before: the pictures of the model that just closed
+    // would be held by nothing but this history.
+    undo_.clear();
+    redo_.clear();
 }
 
 uint64_t TextureStudio::revision() {

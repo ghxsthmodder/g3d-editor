@@ -289,6 +289,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         findViewById<View>(R.id.textureSetBackground).setOnClickListener { applyTextureBackground() }
         findViewById<View>(R.id.textureExport).setOnClickListener { exportTexture() }
         findViewById<View>(R.id.textureDuplicate).setOnClickListener { duplicateLayer() }
+        findViewById<View>(R.id.textureUndo).setOnClickListener { stepTextureHistory(false) }
+        findViewById<View>(R.id.textureRedo).setOnClickListener { stepTextureHistory(true) }
         findViewById<View>(R.id.textureRemove).setOnClickListener {
             textureTool(getString(R.string.texture_name_remove)) { Native.nativeTextureRemove(selectedLayer) }
         }
@@ -813,6 +815,26 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         viewport.requestRender()
     }
 
+    /**
+     * One step over the document of the compositor. Not textureTool: the history is not about the
+     * selected layer, it walks resolutions and imports back too, and a press that lands at the end
+     * of a branch has run out of steps rather than failed.
+     */
+    private fun stepTextureHistory(forward: Boolean) {
+        if (busy || !Native.isAvailable) return
+        val moved = if (forward) Native.nativeTextureRedo() else Native.nativeTextureUndo()
+        if (!moved) {
+            report(
+                getString(
+                    if (forward) R.string.status_texture_no_redo
+                    else R.string.status_texture_no_undo
+                )
+            )
+        }
+        refreshTextureStack()
+        viewport.requestRender()
+    }
+
     private fun refreshTextureStack() {
         if (!Native.isAvailable) return
         val lines = Native.nativeTextureInfo().lineSequence().filter { it.isNotBlank() }.toList()
@@ -1315,7 +1337,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         fun side(key: String): String = megabytes(parts[key] ?: 0L)
         memorySummary.text =
             getString(R.string.memory_line, megabytes(total), side("source"), side("meshes"),
-                      side("layers"), side("edit"))
+                      side("layers"), side("edit"), side("history"))
     }
 
     private fun megabytes(bytes: Long): String =

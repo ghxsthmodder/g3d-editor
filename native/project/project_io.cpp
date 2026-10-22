@@ -198,7 +198,7 @@ bool saveProject(std::vector<uint8_t> &out, ProjectReport &report, std::string &
     std::vector<std::vector<uint8_t>> encoded(layers.size());
     for (size_t i = 0; i < layers.size(); ++i) {
         std::string encodeError;
-        if (!encodePng(layers[i].image, encoded[i], encodeError)) {
+        if (!encodePng(*layers[i].image, encoded[i], encodeError)) {
             // The layer is dropped with a word about it rather than failing the whole save: losing
             // one picture is survivable, losing the project is not.
             addWarningOnce(report.warnings,
@@ -474,6 +474,9 @@ bool openProject(const void *data, size_t length, const std::string &name, Proje
             report.imageBytes += imageBlob.length;
         }
     }
+    // The stack as it was rebuilt from the file is the starting point, not a step: undoing after a
+    // reopened project has to stop at the project the user saved, the same way the UV session does.
+    studio.clearHistory();
     return true;
 }
 

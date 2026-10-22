@@ -36,7 +36,8 @@ public:
     // Puts a saved layer back where the project had it. The ids are reassigned: a reopened stack is
     // numbered by this session, not by the one that wrote the file.
     int addLayerAt(const Image &image, const TextureLayer &at, std::string &error);
-    // The stack as it stands, copies all the way down, for writing a project out.
+    // The stack as it stands, for writing a project out. The pictures come along as the shared
+    // pointers they already are, which is why saving does not copy a texture per layer.
     std::vector<TextureLayer> layers() const;
     bool removeLayer(int id);
     bool duplicateLayer(int id, int &newId, std::string &error);
@@ -60,6 +61,21 @@ public:
     // Forgets the stack and the picture, used when another model replaces the document.
     void reset();
 
+    // --- desfazer e refazer --------------------------------------------------------------
+    // A step is the whole compositor as it stood before one click — canvas, colour behind it and
+    // the layers with their placement — so undoing an import, a removal or a nudge is the same
+    // operation, and a step shares the pictures with the stack instead of copying them.
+    bool canUndo() const { return !undo_.empty(); }
+    bool canRedo() const { return !redo_.empty(); }
+    bool undo();
+    bool redo();
+    // Forgets the records and leaves the stack alone: a project that just opened has no before in
+    // this session, and a model import already threw the stack away with reset().
+    void clearHistory();
+    // The bytes of the pictures only the history still reaches. What the stack shows is counted as
+    // layers; what a dropped layer would cost to forget is counted here.
+    size_t historyBytes() const;
+
     // One summary line and one line per layer, topmost first, in the same "id | nome | resto"
     // shape the mesh hierarchy uses so the panel can parse both the same way.
     std::string describe() const;
@@ -74,11 +90,21 @@ private:
     void touch();  // Marks the stack dirty and moves the revision on. Call with the lock held.
     bool renderLocked(Image &out, std::string &error);
 
+    // Pushes the state a mutation is about to overwrite. Called by every operation that really
+    // changed the stack — a refused click must not become a step to undo through. Call with the
+    // lock held.
+    void remember(const TextureState &before);
+    // Drops the oldest steps once the window is full. The oldest is always kept: undoing the last
+    // click is worth more than an empty history.
+    void trim(std::vector<TextureState> &stack) const;
+
     mutable std::mutex mutex_;
     TextureComposition composition_;
     Image composed_;
     bool dirty_ = true;
     uint64_t revision_ = 0;
+    std::vector<TextureState> undo_;
+    std::vector<TextureState> redo_;
 };
 
 }  // namespace g3d

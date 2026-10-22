@@ -17,7 +17,10 @@ editor também **salva e reabre o projeto** em `.g3dp`: os bytes do modelo de on
 UVs de cada malha e a pilha de camadas com suas imagens, todos dentro de um arquivo só, sem depender
 do caminho em que o modelo foi encontrado — o formato está descrito em [docs/PROJECT.md](docs/PROJECT.md).
 O desfazer e o refazer cobrem a sessão de UV: um arrasto é um passo, e uma geração pode ser desfeita
-até o layout que veio do arquivo. A interface seguiu a proposta do protótipo: paleta de grafite, rail
+até o layout que veio do arquivo. Cobrem também o documento do compositor — resolução da tela, cor de
+fundo e a pilha inteira, um passo por clique —, e como as imagens das camadas são compartilhadas, um
+passo não copia pixel nenhum: desfazer uma remoção traz de volta a mesma imagem que estava lá. A
+interface seguiu a proposta do protótipo: paleta de grafite, rail
 de glifos Material vendorizados no lugar das duas barras de texto, inspetor com as abas Cena | UV |
 Camadas **feito gaveta na beirada de baixo e fechado por padrão** — num telefone o lado escasso é a
 largura, e o atlas é um quadrado: com a coluna lateral de 216 dp aberta sobrava um quadrado de 72 dp
@@ -29,14 +32,14 @@ move as ilhas selecionadas. O comportamento do núcleo é comprovado pelos nove 
 formatos de modelo, o desfazer/refazer e a reabertura de um projeto salvo. A fase também tratou dos
 limites: a **tela do compositor não passa do `GL_MAX_TEXTURE_SIZE`** que o driver informou (as
 resoluções acima ficam apagadas no painel), a **memória retida** aparece na aba Cena somada por
-origem — arquivo, malhas, camadas com a imagem composta e a sessão de UV —, as chamadas caras do JNI
+origem — arquivo, malhas, camadas com a imagem composta, a sessão de UV e o que o histórico ainda
+segura —, as chamadas caras do JNI
 respondem com erro em vez de deixar uma `std::bad_alloc` atravessar para a pilha do Java e a **cena
 de um arquivo pesado é limitada pelo orçamento de memória que o telefone informa**: um glTF de 4 MB
 que apontava 2000 nós para 4 malhas chegou a expandir em 28,7 milhões de vértices e um gigabyte e
 meio, o que fecha o processo antes de qualquer aviso; as referências repetidas no mesmo lugar agora
 são unidas e o que passaria do orçamento fica de fora, com o número dito na mensagem. O layout
-novo, o salvamento e a leitura via SAF ainda não foram validados em telefone, e o desfazer hoje cobre
-a sessão de UV aberta, não o documento inteiro.
+novo, o salvamento e a leitura via SAF ainda não foram validados em telefone.
 
 ## Compilar
 

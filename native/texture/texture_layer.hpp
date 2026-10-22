@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -14,7 +15,10 @@ namespace g3d {
 struct TextureLayer {
     int id = 0;
     std::string name;
-    Image image;
+    // Shared, and read-only after the import: a 2048 picture is eight million bytes, and both a
+    // duplicated layer and an undo step that still remembers it would otherwise pay for a copy. The
+    // pointer is null only on a layer built by hand, which never reaches the canvas.
+    std::shared_ptr<const Image> image;
     float centreX = 0.0f;          // pixels from the left edge
     float centreY = 0.0f;          // pixels from the top edge
     float rotationDegrees = 0.0f;  // clockwise as the image is seen
@@ -24,11 +28,28 @@ struct TextureLayer {
     bool visible = true;
 };
 
+// One whole state of the compositor, which is what an undo step has to remember to put the stack
+// back: the canvas, the colour behind it and the layers with their placement. Because the pictures
+// are shared this costs a handful of numbers instead of a copy of every texture in it.
+struct TextureState {
+    int canvasWidth = 0;
+    int canvasHeight = 0;
+    uint8_t background[3] = {0, 0, 0};  // filled by state(), never read unfilled
+    std::vector<TextureLayer> layers;
+};
+
 // The layer stack of the compositor: the order of the vector is the order of painting, first
 // element at the bottom. Everything here is CPU code with no GL and no file access, which is what
 // makes the exported PNG and the previewed texture the same image.
 class TextureComposition {
 public:
+    // The stack as it stands, for the undo history, and the way back. The device limit stays out of
+    // the state because it is what the driver said today, not something the user chose, and the id
+    // counter only moves forward, so a restored stack cannot hand out an id the interface still has
+    // a row for.
+    TextureState state() const;
+    void setState(const TextureState &state);
+
     // The canvas is the atlas resolution: it has to fit inside the texture the model samples.
     bool setCanvas(int width, int height, std::string &error);
     int canvasWidth() const { return canvasWidth_; }

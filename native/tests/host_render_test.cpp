@@ -395,10 +395,10 @@ int main() {
     renderer.setSplitRatio(g3d::kDefaultSplitRatio);
 
     // --- a tall surface is divided along its height --------------------------------------
-    // The phone holds the editor in portrait and the inspector gave up its column of width, so the
-    // surface is now taller than it is wide. Two panels side by side there would each be measured
-    // by half of the short side; stacked, both keep every pixel across and the atlas square grows.
-    // The bound below is 80% of the width because the atlas keeps a margin of its own in the panel.
+    // The app is locked to landscape, but the surface is whatever the window hands over: a tablet
+    // held up or a split-screen window comes out taller than wide, and two panels side by side
+    // there would each be measured by half of the short side. Stacked, both keep every pixel
+    // across. The bound below is 80% of the width because the atlas keeps a margin of its own.
     renderer.onSurfaceChanged(360, 640);
     renderer.setSplitRatio(g3d::kAtlasDominantSplitRatio);
     int atlasFirst = -1;
@@ -422,6 +422,39 @@ int main() {
     float stripUv[2] = {-1.0f, -1.0f};
     check(!renderer.uvAt(180.0f, 30.0f, stripUv),
           "a faixa de cima e do modelo: ali o toque nao cai no atlas");
+
+    // --- a wide surface hands the atlas only what a square can use -------------------------------
+    // The ratio is a fraction of the width, but the square is measured by the height: wider than
+    // that, the extra columns are letterbox no island is ever drawn in. The model draws whatever
+    // rectangle it is handed, so the surplus goes to the 3D view instead of sitting empty beside
+    // the atlas. The panel bounds are private, so what is read here is the square: centred in its
+    // panel it leaves one margin on each side, and the model begins one further margin left.
+    renderer.onSurfaceChanged(640, 360);
+    int wideFirst = -1;
+    int wideLast = -1;
+    for (int x = 0; x < 640; ++x) {
+        float point[2] = {-1.0f, -1.0f};
+        if (!renderer.uvAt(static_cast<float>(x) + 0.5f, 180.0f, point)) {
+            continue;
+        }
+        if (wideFirst < 0) {
+            wideFirst = x;
+        }
+        wideLast = x;
+    }
+    const int wideSpan = wideLast - wideFirst + 1;
+    check(wideSpan * 100 >= 360 * 88 && wideSpan <= 360,
+          "em deitado o quadrado do atlas e medido pela altura, alcance=" +
+              std::to_string(wideSpan));
+    const int atlasMargin = 639 - wideLast;
+    check(atlasMargin * 100 <= 360 * 12,
+          "a direita do quadrado e a margem do painel e nao letterbox, folga=" +
+              std::to_string(atlasMargin));
+    check(wideFirst - atlasMargin >= 200,
+          "o modelo recebe a largura que o quadrado nao usa, colunas=" +
+              std::to_string(wideFirst - atlasMargin));
+    float modelUv[2] = {-1.0f, -1.0f};
+    check(!renderer.uvAt(50.0f, 180.0f, modelUv), "a esquerda continua sendo o modelo");
     renderer.onSurfaceChanged(kSize, kSize);
     renderer.setSplitRatio(g3d::kDefaultSplitRatio);
 

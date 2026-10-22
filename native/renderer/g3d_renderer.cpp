@@ -648,6 +648,15 @@ void Renderer::rectOf(int part, int out[4]) const {
     const bool stacked = surfaceHeight > surfaceWidth;
     const int split = static_cast<int>(
         static_cast<float>(stacked ? surfaceHeight : surfaceWidth) * ratio);
+    // The atlas is a square measured by the short side of its panel, so a panel longer than that
+    // side divided by the margin carries bands no island is ever drawn in. The atlas does not want
+    // those pixels and the model draws whatever shape it is given, so the surplus goes to the model
+    // and the atlas keeps the edge it was asked for.
+    const int along = stacked ? surfaceHeight : surfaceWidth;
+    const int across = stacked ? surfaceWidth : surfaceHeight;
+    const int useful = std::min(
+        static_cast<int>(static_cast<float>(across) / kAtlasMarginRatio) + 1, along - 1);
+    const int atlasSpan = std::min(useful, std::max(along - split, 1));
     if (part == 0) {
         if (mode == kViewAtlasOnly) {
             return;
@@ -657,8 +666,8 @@ void Renderer::rectOf(int part, int out[4]) const {
             out[3] = surfaceHeight;
             return;
         }
-        out[2] = stacked ? surfaceWidth : split;
-        out[3] = stacked ? split : surfaceHeight;
+        out[2] = stacked ? surfaceWidth : along - atlasSpan;
+        out[3] = stacked ? along - atlasSpan : surfaceHeight;
         return;
     }
     if (mode == kViewThreeDimensional) {
@@ -666,12 +675,12 @@ void Renderer::rectOf(int part, int out[4]) const {
     }
     if (mode == kViewSplit) {
         if (stacked) {
-            out[1] = split;
+            out[1] = along - atlasSpan;
             out[2] = surfaceWidth;
-            out[3] = std::max(surfaceHeight - split, 1);
+            out[3] = atlasSpan;
         } else {
-            out[0] = split;
-            out[2] = std::max(surfaceWidth - split, 1);
+            out[0] = along - atlasSpan;
+            out[2] = atlasSpan;
             out[3] = surfaceHeight;
         }
         return;

@@ -66,6 +66,9 @@ std::string percent(float fraction) {
 std::string UvEditReport::describe() const {
     std::string text = "selecionadas=" + std::to_string(selectionCount) +
                        " area_atlas=" + percent(coveredArea) + "%";
+    if (lockedCount > 0) {
+        text += " bloqueadas=" + std::to_string(lockedCount);
+    }
     if (clean()) {
         return text + " sem problemas";
     }
@@ -105,6 +108,7 @@ void UvSession::clear() {
     loadedUvs_.clear();
     islands_.clear();
     selected_.clear();
+    locked_.clear();
 }
 
 void UvSession::setAtlasSize(uint32_t width, uint32_t height) {
@@ -114,6 +118,49 @@ void UvSession::setAtlasSize(uint32_t width, uint32_t height) {
 
 bool UvSession::isSelected(uint32_t island) const {
     return std::find(selected_.begin(), selected_.end(), island) != selected_.end();
+}
+
+bool UvSession::isLocked(uint32_t island) const {
+    return island < locked_.size() && locked_[island] != 0;
+}
+
+size_t UvSession::lockedCount() const {
+    size_t count = 0;
+    for (uint32_t index = 0; index < islands_.count(); ++index) {
+        count += isLocked(index) ? 1u : 0u;
+    }
+    return count;
+}
+
+size_t UvSession::movableCount() const {
+    size_t count = 0;
+    for (const uint32_t island : selected_) {
+        count += isLocked(island) ? 0u : 1u;
+    }
+    return count;
+}
+
+bool UvSession::lockSelection() { return setLockedForSelection(true); }
+
+bool UvSession::unlockSelection() { return setLockedForSelection(false); }
+
+// A pin does not take an island out of the selection: the group that is highlighted is how a locked
+// island is reached again to be released, and the tools below simply pass over it. The flag
+// array is only as long as the largest island index ever pinned: the layout is re-grouped on
+// every edit and a pin whose island is gone is never read again.
+bool UvSession::setLockedForSelection(bool locked) {
+    size_t changed = 0;
+    for (const uint32_t island : selected_) {
+        if (island >= islands_.count() || isLocked(island) == locked) {
+            continue;
+        }
+        if (island >= locked_.size()) {
+            locked_.resize(island + 1, 0);
+        }
+        locked_[island] = locked ? 1 : 0;
+        ++changed;
+    }
+    return changed > 0;
 }
 
 bool UvSession::hasChanges() const {
@@ -172,6 +219,12 @@ bool UvSession::requireSelection(const char *operation, std::string &error) cons
         error = std::string(operation) + " precisa de pelo menos uma ilha selecionada";
         return false;
     }
+    if (movableCount() == 0) {
+        // The group is there, the pins are why nothing happens: saying "selecione uma ilha" here
+        // would send the user looking for a selection they can see on the screen.
+        error = std::string(operation) + " nao alcanca ilhas bloqueadas";
+        return false;
+    }
     return true;
 }
 
@@ -180,6 +233,9 @@ void UvSession::transformSelection(float angleRadians, float scale, float pivotU
                                    float du, float dv) {
     std::vector<uint8_t> marked(working_.vertexCount(), 0);
     for (const uint32_t island : selected_) {
+        if (isLocked(island)) {
+            continue;
+        }
         const UvIsland *group = islands_.island(island);
         if (group == nullptr) {
             continue;
@@ -288,13 +344,18 @@ bool UvSession::scale(float factor, float pivotU, float pivotV) {
 }
 
 bool UvSession::selectionBounds(float out[4]) const {
-    if (selected_.empty()) {
+    if (movableCount() == 0) {
         return false;
     }
     float minimum[2] = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
     float maximum[2] = {std::numeric_limits<float>::lowest(),
                         std::numeric_limits<float>::lowest()};
     for (const uint32_t island : selected_) {
+        // The box is what a tool is about to change, so a pin is left out of it: a fit that shrank
+        // the group around a locked island would move the locked one with it.
+        if (isLocked(island)) {
+            continue;
+        }
         const UvIsland *group = islands_.island(island);
         if (group == nullptr) {
             continue;
@@ -354,12 +415,27 @@ bool UvSession::repack(uint32_t paddingTexels) {
         float x;
         float y;
     };
-    std::vector<Slot> slots(count);
+    // A pinned island keeps the place it was left in, and the box it occupies is what the shelves
+    // below have to step over: repacking around finished islands is the reason to pin one.
+    std::vector<float> reserved;  // Four floats per pinned island: minU, minV, maxU, maxV.
+    std::vector<Slot> slots;
+    slots.reserve(count);
     for (uint32_t index = 0; index < count; ++index) {
         const UvIsland *group = islands_.island(index);
-        slots[index].island = index;
-        slots[index].width = group->boundsMax[0] - group->boundsMin[0];
-        slots[index].height = group->boundsMax[1] - group->boundsMin[1];
+        if (isLocked(index)) {
+            reserved.insert(reserved.end(),
+                            {group->boundsMin[0], group->boundsMin[1], group->boundsMax[0],
+                             group->boundsMax[1]});
+            continue;
+        }
+        Slot slot;
+        slot.island = index;
+        slot.width = group->boundsMax[0] - group->boundsMin[0];
+        slot.height = group->boundsMax[1] - group->boundsMin[1];
+        slots.push_back(slot);
+    }
+    if (slots.empty()) {
+        return false;  // Every island is pinned: there is nothing to place.
     }
     // Tallest first keeps the shelves few and the packing tight.
     std::sort(slots.begin(), slots.end(), [](const Slot &left, const Slot &right) {
@@ -381,6 +457,20 @@ bool UvSession::repack(uint32_t paddingTexels) {
     const auto shelfPack = [&](float layoutScale) {
         const float gapU = baseGapU * layoutScale;
         const float gapV = baseGapV * layoutScale;
+        // The first row above a pinned box the candidate would still be inside, or -1 for a clear
+        // spot. The gap is asked for on both sides of the box, the same as between two islands.
+        const auto blockedAbove = [&](float x, float y, float w, float h) {
+            for (size_t box = 0; box + 3 < reserved.size(); box += 4) {
+                const float left = reserved[box] - gapU;
+                const float bottom = reserved[box + 1] - gapV;
+                const float right = reserved[box + 2] + gapU;
+                const float top = reserved[box + 3] + gapV;
+                if (x < right && left < x + w && y < top && bottom < y + h) {
+                    return top;
+                }
+            }
+            return -1.0f;
+        };
         float cursorX = gapU;
         float cursorY = gapV;
         float shelfHeight = 0.0f;
@@ -388,9 +478,21 @@ bool UvSession::repack(uint32_t paddingTexels) {
         for (Slot &slot : slots) {
             const float width = slot.width * layoutScale;
             const float height = slot.height * layoutScale;
-            if (cursorX + width + gapU > 1.0f && cursorX > gapU) {
+            // A spot that collides is retried above the box it hit. The retries are bounded: pinned
+            // islands stacked to the top of the atlas can leave no row that is clear, and a last
+            // attempt that still touches one is reported by the overlap warning rather than lost.
+            for (uint32_t attempt = 0; attempt < 8; ++attempt) {
+                if (cursorX + width + gapU > 1.0f && cursorX > gapU) {
+                    cursorX = gapU;
+                    cursorY += shelfHeight + gapV;
+                    shelfHeight = 0.0f;
+                }
+                const float above = blockedAbove(cursorX, cursorY, width, height);
+                if (above < 0.0f) {
+                    break;
+                }
                 cursorX = gapU;
-                cursorY += shelfHeight + gapV;
+                cursorY = above;
                 shelfHeight = 0.0f;
             }
             slot.x = cursorX;
@@ -548,7 +650,7 @@ std::string UvSession::historyDescribe() const {
 size_t UvSession::memoryBytes() const {
     size_t bytes = working_.memoryBytes() + islands_.memoryBytes() +
                    loadedUvs_.capacity() * sizeof(float) +
-                   selected_.capacity() * sizeof(uint32_t);
+                   selected_.capacity() * sizeof(uint32_t) + locked_.capacity();
     for (const Step &step : undo_) {
         bytes += stepBytes(step);
     }
@@ -564,6 +666,7 @@ UvEditReport UvSession::validate() const {
         return report;
     }
     report.selectionCount = static_cast<uint32_t>(selected_.size());
+    report.lockedCount = static_cast<uint32_t>(lockedCount());
 
     constexpr int grid = 64;
     std::vector<uint32_t> owner(grid * grid, kNoIsland);
@@ -625,6 +728,7 @@ std::string UvSession::describe() const {
     }
     return "ilhas=" + std::to_string(islands_.count()) +
            " selecionadas=" + std::to_string(selected_.size()) +
+           " bloqueadas=" + std::to_string(lockedCount()) +
            " faces=" + std::to_string(working_.triangleCount()) +
            (hasChanges() ? " com_edicoes" : " sem_edicoes");
 }

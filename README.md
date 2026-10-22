@@ -30,7 +30,12 @@ gastaria 210 dp da altura e deixaria o atlas com 151 dp (aritmética de tela, ai
 aparelho) —, atlas dominante quando a edição é dele, a superfície dividida pelo seu lado curto —
 e no deitado o painel do atlas recebe no máximo o que um quadrado consegue usar, a sobra voltando
 para o modelo em vez de virar tarja vazia ao lado das ilhas — e arrastar com um dedo move as ilhas
-selecionadas. O comportamento do núcleo é comprovado pelos nove testes do host
+selecionadas. A seleção aceita pino: a ilha bloqueada continua destacada para poder ser destravada,
+mas nenhuma ferramenta a alcança, um arrasto cujo grupo inteiro está pinado é recusado e o dedo
+volta para a câmera, e o reempacotamento contorna a caixa que ela ocupa em vez de soterrá-la — o
+azul do preenchimento é o que diz qual está pinada, o contorno âmbar continua dizendo sobre o que o
+clique age, e a linha de estado da aba UV conta `bloqueadas=N`. O comportamento do núcleo é
+comprovado pelos nove testes do host
 (`bash native/tests/run_host_test.sh`), inclusive o renderizador headless, a ida e volta dos três
 formatos de modelo, o desfazer/refazer e a reabertura de um projeto salvo. A fase também tratou dos
 limites: a **tela do compositor não passa do `GL_MAX_TEXTURE_SIZE`** que o driver informou (as

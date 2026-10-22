@@ -72,6 +72,8 @@
     <string name="uv_scale_up">1,25×</string>
     <string name="uv_fit">Ajustar</string>
     <string name="uv_repack">Reempacotar</string>
+    <string name="uv_lock">Bloquear</string>
+    <string name="uv_unlock">Destravar</string>
     <string name="uv_undo">Desfazer</string>
     <string name="uv_redo">Refazer</string>
     <string name="uv_frame_atlas">Reenquadrar UV</string>
@@ -85,6 +87,8 @@
     <string name="uv_name_repack">reempacotar</string>
     <string name="uv_name_select_all">selecionar tudo</string>
     <string name="uv_name_select_none">limpar a seleção</string>
+    <string name="uv_name_lock">bloquear a seleção</string>
+    <string name="uv_name_unlock">destravar a seleção</string>
 
     <string name="status_uv_no_mesh">nenhuma malha selecionada — toque no modelo ou escolha uma na hierarquia antes de abrir o editor UV</string>
     <string name="status_uv_opening">abrindo o editor UV na malha %1$d …</string>
@@ -99,6 +103,8 @@
     <string name="status_uv_apply_failed">não foi possível aplicar: %1$s</string>
     <string name="status_uv_cancelled">edição cancelada: os UVs da malha não mudaram</string>
     <string name="status_uv_noop">%1$s não fez nada: selecione uma ilha no atlas primeiro</string>
+    <string name="status_uv_nothing_to_lock">bloquear não fez nada: as ilhas destacadas já estão travadas, ou não há nenhuma</string>
+    <string name="status_uv_nothing_locked">não havia nenhuma ilha bloqueada na seleção para destravar</string>
     <string name="status_uv_no_undo">nada para desfazer nesta edição</string>
     <string name="status_uv_no_redo">nada para refazer nesta edição</string>
     <string name="status_uv_pick">ilha %1$d selecionada</string>

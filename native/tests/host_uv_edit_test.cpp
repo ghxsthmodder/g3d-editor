@@ -280,6 +280,77 @@ int main() {
     }
     check(shapesKept, "reempacotar so move e reduz proporcionalmente, sem deformar as ilhas");
 
+    // --- pinning an island -----------------------------------------------------------------
+    // A pin is how an island that is already right stops being in the way. The packed session is
+    // reused because its islands are separated: the box one of them holds is a real obstacle for
+    // the others, and not the whole atlas the file's stacked layout would hand over.
+    check(fresh.isSelected(3), "a ilha 3 continua selecionada do empacotamento acima");
+    check(fresh.lockedCount() == 0, "nenhuma ilha comeca com pino");
+    check(fresh.lockSelection(), "o pino pega a ilha selecionada");
+    check(fresh.isLocked(3) && fresh.lockedCount() == 1, "a ilha fica marcada como bloqueada");
+    check(!fresh.lockSelection(), "bloquear o que ja esta bloqueado nao faz nada");
+    check(fresh.isSelected(3), "a ilha com pino continua selecionada: assim ela pode ser solta");
+    check(fresh.movableCount() == 0, "uma selecao so com pinos nao alcansa nada");
+    float heldBox[4];
+    islandBounds(fresh.mesh(), fresh.islands(), 3, heldBox);
+    check(!fresh.translate(0.1f, 0.0f), "mover nao alcansa uma ilha com pino");
+    check(!fresh.rotate(static_cast<float>(M_PI) * 0.5f, 0.5f, 0.5f),
+          "girar nao alcansa uma ilha com pino");
+    check(!fresh.scale(2.0f, 0.5f, 0.5f), "escalar nao alcansa uma ilha com pino");
+    check(!fresh.fitSelectionToAtlas(), "ajustar nao alcansa uma ilha com pino");
+    float heldStill[4];
+    islandBounds(fresh.mesh(), fresh.islands(), 3, heldStill);
+    check(heldStill[0] == heldBox[0] && heldStill[1] == heldBox[1] &&
+              heldStill[2] == heldBox[2] && heldStill[3] == heldBox[3],
+          "nenhuma ferramenta encostou na ilha bloqueada");
+
+    // A mixed group is what the finger actually does: the reachable islands follow the drag and the
+    // pinned one is left out of the box the tool shrinks and moves.
+    check(fresh.selectIsland(1, true), "somar uma ilha livre a selecao");
+    check(fresh.movableCount() == 1, "a ferramenta ve apenas a ilha que pode alcancar");
+    g3d::UvEditReport pinnedReport = fresh.validate();
+    const bool pinIsSaid = pinnedReport.describe().find("bloqueadas=1") != std::string::npos;
+    check(pinnedReport.lockedCount == 1 && pinIsSaid,
+          "o relatorio conta as ilhas bloqueadas");
+    float freeBefore[4];
+    islandBounds(fresh.mesh(), fresh.islands(), 1, freeBefore);
+    check(fresh.translate(0.05f, 0.0f), "mover a selecao mista");
+    float freeAfter[4];
+    islandBounds(fresh.mesh(), fresh.islands(), 1, freeAfter);
+    islandBounds(fresh.mesh(), fresh.islands(), 3, heldStill);
+    check(closeTo(freeAfter[0], freeBefore[0] + 0.05f), "a ilha livre seguiu o arrasto");
+    check(heldStill[0] == heldBox[0] && heldStill[3] == heldBox[3],
+          "a ilha com pino ficou onde estava");
+
+    // Repacking around a pin: the pinned box is the one the shelves step over, and the islands that
+    // are still free have to keep their place in the atlas.
+    check(fresh.repack(8), "reempacotar com uma ilha bloqueada");
+    islandBounds(fresh.mesh(), fresh.islands(), 3, heldStill);
+    check(heldStill[0] == heldBox[0] && heldStill[1] == heldBox[1] &&
+              heldStill[2] == heldBox[2] && heldStill[3] == heldBox[3],
+          "o reempacotamento deixou a ilha com pino no lugar");
+    g3d::UvEditReport afterPinnedRepack = fresh.validate();
+    check(afterPinnedRepack.overlapping.empty(),
+          "as ilhas reempacotadas nao se jogaram por cima da bloqueada");
+    check(afterPinnedRepack.outsideAtlas.empty(),
+          "o pino nao empurrou ninguem para fora do atlas");
+    check(afterPinnedRepack.lockedCount == 1, "o reempacotamento nao solta os pinos");
+
+    // The pin belongs to the session and not to the layout, so taking the repack back keeps the
+    // island pinned: undoing an edit is not a way to unlock what was never edited.
+    check(fresh.undo(), "desfazer o reempacotamento");
+    check(fresh.isLocked(3) && fresh.lockedCount() == 1, "desfazer nao mexe nos pinos");
+    islandBounds(fresh.mesh(), fresh.islands(), 3, heldStill);
+    check(heldStill[0] == heldBox[0] && heldStill[3] == heldBox[3],
+          "a ilha com pino voltou ao lugar de antes do empacotamento");
+    check(fresh.unlockSelection(), "destravar a selecao");
+    check(!fresh.isLocked(3) && fresh.lockedCount() == 0, "solto o pino, a ilha esta livre");
+    check(!fresh.unlockSelection(), "destravar sem nada com pino nao faz nada");
+    islandBounds(fresh.mesh(), fresh.islands(), 3, heldStill);
+    check(fresh.translate(0.02f, 0.0f), "sem pino a ilha volta a ser movida");
+    islandBounds(fresh.mesh(), fresh.islands(), 3, freeAfter);
+    check(closeTo(freeAfter[0], heldStill[0] + 0.02f), "a ilha destravada seguiu o mover");
+
     // --- a generated layout is a valid starting point too ----------------------------------
     g3d::UvOptions options;
     options.padding = 4;
@@ -382,6 +453,27 @@ int main() {
     islandBoundsFromLayout(editor, snapshot, 0, boxAfter);
     check(std::fabs((boxAfter[2] - boxAfter[0]) - heightBefore * 0.5f) < 1e-3f,
           "escalar reduz a ilha pela metade");
+
+    // The pin as the interface reaches it: the atlas has to be told which island to draw apart from
+    // the rest, a tool has to pass over it, and a group made only of pins has to refuse the drag so
+    // the touch falls back to the camera instead of moving nothing.
+    check(editor.lockSelection(), "a interface bloqueia a selecao");
+    check(editor.layout(snapshot) && snapshot.locked.size() == 1 && snapshot.locked[0] == 0,
+          "o layout entrega a ilha bloqueada ao renderizador");
+    check(editor.movableCount() == 0, "uma selecao so de pinos nao arrasta nada");
+    const uint64_t revisionWithPin = snapshot.revision;
+    islandBoundsFromLayout(editor, snapshot, 0, boxBefore);
+    check(!editor.translate(0.05f, 0.0f), "mover pela interface nao alcansa o pino");
+    check(editor.layout(snapshot) && snapshot.revision == revisionWithPin,
+          "uma ferramenta recusada nao reescreve o layout");
+    islandBoundsFromLayout(editor, snapshot, 0, boxAfter);
+    check(boxAfter[0] == boxBefore[0] && boxAfter[3] == boxBefore[3],
+          "a ilha com pino nao se moveu pela interface");
+    check(editor.unlockSelection(), "a interface solta o pino");
+    check(editor.layout(snapshot) && snapshot.locked.empty(),
+          "o layout avisa que nao ha mais ilha bloqueada");
+    check(!editor.unlockSelection(), "destravar duas vezes nao faz nada");
+    check(editor.movableCount() == 1, "solto o pino a selecao volta a ser alcancavel");
 
     editor.cancel();
     check(!editor.isActive(), "cancelar fecha a sessao");

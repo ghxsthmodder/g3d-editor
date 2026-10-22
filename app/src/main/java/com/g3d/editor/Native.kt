@@ -92,6 +92,15 @@ object Native {
     external fun nativeUvRepack(padding: Int): Boolean
 
     /**
+     * Pins what is selected, or releases it. A pinned island stays in the group it was picked with,
+     * which is how it is reached again, and no move, rotation, scale, fit or repack lands on it.
+     * False when there was nothing to change, so the button can say so without a dialog.
+     */
+    external fun nativeUvLock(): Boolean
+
+    external fun nativeUvUnlock(): Boolean
+
+    /**
      * Steps back and forth over the edits of the open session. A drag of the atlas is one step: the
      * grab opened it and [nativeUvEndGesture] closes it, so the five moves of a swipe are undone
      * together. Applying the layout closes the history, which then belongs to the document.

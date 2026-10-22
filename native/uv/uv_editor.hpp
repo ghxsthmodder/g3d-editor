@@ -19,6 +19,7 @@ struct UvLayout {
     std::vector<uint32_t> indices;     // Triangle list of the mesh being edited.
     std::vector<uint32_t> faceIsland;  // Island per triangle.
     std::vector<uint32_t> selected;    // Islands the user has picked.
+    std::vector<uint32_t> locked;      // Islands pinned where they are: no tool reaches them.
     std::vector<float> islandBounds;   // Four floats per island: minU, minV, maxU, maxV.
     std::vector<uint32_t> overlapping; // Islands that share UV space with another.
 };
@@ -47,6 +48,14 @@ public:
     bool isSelected(uint32_t island);
     // How many islands a tool would act on. False for an empty selection, which no drag can move.
     size_t selectionCount();
+    // Pinning what is selected, and releasing it. A pinned island stays in the group it was picked
+    // with so it can be reached again, and every tool passes over it until it is released.
+    bool lockSelection();
+    bool unlockSelection();
+    // How much of the selection a tool would reach. A drag whose group is all pinned moves
+    // nothing, so it is refused the same way an empty one is: what is highlighted is what
+    // follows the finger.
+    size_t movableCount();
     bool translate(float du, float dv);
     bool rotate(float angleRadians, float pivotU, float pivotV);
     bool scale(float factor, float pivotU, float pivotV);

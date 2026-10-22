@@ -442,6 +442,18 @@ JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvRepack(JNIEnv *, j
     return packed ? JNI_TRUE : JNI_FALSE;
 }
 
+// --- pinning islands --------------------------------------------------------------------
+// A pin keeps the island in the group it was picked with, because that group is the only way back
+// to it on a touchscreen, and takes it out of every tool's reach until it is released.
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvLock(JNIEnv *, jclass) {
+    return g3d::UvEditor::instance().lockSelection() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvUnlock(JNIEnv *, jclass) {
+    return g3d::UvEditor::instance().unlockSelection() ? JNI_TRUE : JNI_FALSE;
+}
+
 // --- undo and redo ---------------------------------------------------------------------
 
 JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvUndo(JNIEnv *, jclass) {

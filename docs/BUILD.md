@@ -42,8 +42,8 @@ Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembl
 dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
 não é necessário.
 
-Medidas do último *build* de depuração: `app-debug.apk` de 18.659.968 bytes (17,8 MiB), com
-`libg3dnative.so` despojado de 5.180.288 bytes (arm64-v8a) e 5.021.872 bytes (x86_64), os dois
+Medidas do último *build* de depuração: `app-debug.apk` de 18.667.696 bytes (17,8 MiB), com
+`libg3dnative.so` despojado de 5.188.248 bytes (arm64-v8a) e 5.029.600 bytes (x86_64), os dois
 empacotados sem compressão. O módulo de projeto traz o RapidJSON que já vinha com o
 Assimp (cabeçalhos, instanciados onde o projeto é escrito e lido), e é dele boa parte desse aumento.
 É Debug com símbolos parciais, não Release: o número serve para acompanhar a tendência quando algo é
@@ -67,7 +67,7 @@ diff <(nm -D --defined-only "$SO" | grep -o 'Java_com_g3d_editor_Native_[a-zA-Z_
       sed 's/external fun //' | sort)
 ```
 
-Sem saída, os dois lados batem. São 66 funções declaradas e 66 exportadas neste momento.
+Sem saída, os dois lados batem. São 68 funções declaradas e 68 exportadas neste momento.
 
 ## Testar o núcleo nativo sem dispositivo
 
@@ -83,12 +83,12 @@ CTest (nenhum deles faz parte do APK):
 | `uv_smoke_test` | `host_smoke_test` | geração de UV com xatlas a partir de geometria sintética |
 | `import_test` | `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento, inclusive as referências repetidas de um mesmo glTF unidas no lugar, o orçamento de memória que para a cena e diz quantas partes ficaram de fora, e os nomes com bytes fora do UTF-8 que o telefone recusaria |
 | `uv_islands_test` | `host_uv_test` | agrupamento de UVs em ilhas e conectividade |
-| `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, validar, aplicar/cancelar, o desfazer/refazer, inclusive o arrasto inteiro num passo, e a memória que a sessão aberta retém |
+| `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, o pino que tira a ilha do alcance das ferramentas e que o reempacotamento contorna, validar, aplicar/cancelar, o desfazer/refazer, inclusive o arrasto inteiro num passo, e a memória que a sessão aberta retém |
 | `export_test` | `host_export_test` | exportação OBJ/glTF/GLB em memória, ida e volta relida pelo importador: posição, UV e normal por canto, os pares `.gltf`+`.bin` e os avisos de perda |
 | `compose_test` | `host_compose_test` | pilha de camadas: fundo, mover, girar, escalar, opacidade, visibilidade, ordem, duplicar, remover, as duas recusas de tela (limite da GPU e orçamento de megapixels), a conta de memória retida com a imagem composta, o desfazer/refazer do documento — tela, fundo e pilha, com as imagens compartilhadas e o teto de 64 passos — e o PNG resultante |
 | `project_test` | `host_project_test` | container `.g3dp`: escrita e leitura, cabeçalho cortado, mágica errada, versão futura, bloco desalinhado, arquivo truncado, e a ida e volta do editor inteiro — UVs aplicados byte a byte, tela, fundo, ordem, posição, giro, escala, opacidade e visibilidade das camadas |
 | `image_test` | `host_image_test` | decodificação PNG/JPEG (stb), ida e volta sem perdas do PNG, paleta com transparência, limite de pixels e quadriculado de referência |
-| `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer: vista 3D, vista 2D do atlas, a divisão da superfície pelo lado curto (numa superfície alta os dois painéis ficam um sobre o outro e o atlas mede-se pela largura quase toda — no telefone, travado em paisagem, quem manda é a altura e a divisão continua sendo pela largura, com o painel do atlas cortado no que um quadrado consegue usar e a sobra devolvida ao modelo), a textura composta aplicada nos dois modos e o `GL_MAX_TEXTURE_SIZE` do driver publicado como limite de tela do compositor |
+| `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer: vista 3D, vista 2D do atlas, a divisão da superfície pelo lado curto (numa superfície alta os dois painéis ficam um sobre o outro e o atlas mede-se pela largura quase toda — no telefone, travado em paisagem, quem manda é a altura e a divisão continua sendo pela largura, com o painel do atlas cortado no que um quadrado consegue usar e a sobra devolvida ao modelo), o pino de ilha publicado no preenchimento sem tirar o contorno da seleção, a textura composta aplicada nos dois modos e o `GL_MAX_TEXTURE_SIZE` do driver publicado como limite de tela do compositor |
 
 `render_test` só é construído quando o host tem EGL + OpenGL ES 3 (`libegl-dev`,
 `libgles-dev`/Mesa). Ele usa a plataforma *surfaceless* do Mesa e, quando não há contexto

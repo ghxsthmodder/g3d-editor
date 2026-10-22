@@ -616,6 +616,43 @@ int main() {
     check(repackChannels > 100,
           "reagrupar muda o desenho do atlas, canais=" + std::to_string(repackChannels));
 
+    // --- a pin colours the islands it holds ------------------------------------------------
+    // The outline stays amber because the ring is what says which islands a tool reaches, and the
+    // pin reads through the fill: on the screen the two channels stay as apart as they are in the
+    // code, and an island in the group and pinned at once says both.
+    check(editor.lockSelection(), "bloquear a selecao pelo renderizador");
+    // A drag over a group of pins would move nothing, so the gesture is refused and the touch
+    // belongs to the camera: what is highlighted has to be what follows the finger.
+    check(!renderer.uvGrab(islandPixel[0], islandPixel[1], false),
+          "um grupo de pinos nao e agarrado");
+    renderer.draw();
+    const std::vector<unsigned char> pinned = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "ilhas_bloqueadas", pinned);
+    int pinChannels = 0;
+    for (size_t i = 0; i < repacked.size(); ++i) {
+        if (std::abs(static_cast<int>(pinned[i]) - static_cast<int>(repacked[i])) > 4) {
+            ++pinChannels;
+        }
+    }
+    check(pinChannels > 30,
+          "o pino muda o preenchimento das ilhas, canais=" + std::to_string(pinChannels));
+    const int amberPinned = countColorIn(pinned, kAtlasLeft, kSize, kOutlineColor[0],
+                                         kOutlineColor[1], kOutlineColor[2], 8.0f);
+    check(amberPinned > 0 && amberPinned <= amberRepacked + 8,
+          "o contorno ambar continua dizendo o que a ferramenta alcanca, pixels=" +
+              std::to_string(amberPinned));
+    check(editor.unlockSelection(), "destravar a selecao");
+    renderer.draw();
+    const std::vector<unsigned char> unpinned = readPixels();
+    int backChannels = 0;
+    for (size_t i = 0; i < repacked.size(); ++i) {
+        if (unpinned[i] != repacked[i]) {
+            ++backChannels;
+        }
+    }
+    check(backChannels == 0,
+          "solto o pino o atlas volta a ser o mesmo, canais=" + std::to_string(backChannels));
+
     // --- the other view modes -------------------------------------------------------------
     renderer.setViewMode(g3d::Renderer::kViewAtlasOnly);
     renderer.draw();

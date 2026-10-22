@@ -1056,7 +1056,9 @@ bool Renderer::uvGrab(float xPixels, float yPixels, bool additive) {
             editor.select(index, additive);
         }
     }
-    return editor.selectionCount() > 0;
+    // A group of pinned islands is a group nothing follows: the drag is refused so the touch falls
+    // back to the camera instead of moving a selection the pin was put on to hold still.
+    return editor.movableCount() > 0;
 }
 
 // The affine maps UV to clip space, so one surface pixel is 2 / (scale * panelWidth) of a UV unit
@@ -1124,6 +1126,7 @@ void Renderer::rebuildUvGeometry() {
     const bool hasLayout = editor.layout(layout) && !layout.indices.empty();
     std::set<uint32_t> selectedSet(layout.selected.begin(), layout.selected.end());
     std::set<uint32_t> overlapSet(layout.overlapping.begin(), layout.overlapping.end());
+    std::set<uint32_t> lockedSet(layout.locked.begin(), layout.locked.end());
 
     // Colour of one island, written into color: amber when selected, red while it overlaps another
     // island, and a hue otherwise. Selection wins because the user needs to see what a tool acts on.
@@ -1138,6 +1141,15 @@ void Renderer::rebuildUvGeometry() {
             color[3] = 1.0f;
         }
         color[3] = alpha;
+    };
+    // The pin colours the fill and leaves the outline alone: the amber ring is what a tool acts on,
+    // and an island that is both in the group and pinned has to say both at once.
+    const auto islandFill = [&lockedSet, &islandColor, &color](uint32_t island, float alpha) {
+        islandColor(island, alpha);
+        if (lockedSet.count(island) != 0) {
+            std::copy(std::begin(kAtlasLocked), std::end(kAtlasLocked), &color[0]);
+            color[3] = alpha;
+        }
     };
     const auto uvOf = [&layout](uint32_t vertex) {
         return vertex * 2 + 1 < layout.uvs.size();
@@ -1175,8 +1187,8 @@ void Renderer::rebuildUvGeometry() {
                                     ? layout.faceIsland[face / 3]
                                     : kNoIsland;
 
-        // Translucent fills make an overlap visible before the report is ever read.
-        islandColor(island, selectedSet.count(island) != 0 ? 0.45f : 0.28f);
+        // Translucent fills make an overlap or a pin visible before the report is ever read.
+        islandFill(island, selectedSet.count(island) != 0 ? 0.45f : 0.28f);
         for (const uint32_t index : corner) {
             pushVertex(layout.uvs[index * 2], layout.uvs[index * 2 + 1], color);
         }

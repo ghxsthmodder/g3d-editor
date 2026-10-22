@@ -16,6 +16,7 @@ struct UvEditReport {
     std::vector<uint32_t> outsideAtlas;  // Islands with any UV outside 0..1.
     std::vector<uint32_t> overlapping;   // Islands sharing UV space with another island.
     uint32_t selectionCount = 0;
+    uint32_t lockedCount = 0;     // Islands no tool reaches until they are unlocked.
     float coveredArea = 0.0f;  // Atlas area actually claimed by islands.
 
     bool clean() const { return outsideAtlas.empty() && overlapping.empty(); }
@@ -36,6 +37,9 @@ public:
     uint32_t islandCount() const { return islands_.count(); }
     const std::vector<uint32_t> &selection() const { return selected_; }
     bool isSelected(uint32_t island) const;
+    // A pinned island: no tool reaches it and the repackager leaves it exactly where it is.
+    bool isLocked(uint32_t island) const;
+    size_t lockedCount() const;
     bool hasChanges() const;
 
     // Selection. Additive selection keeps what is already chosen, which is how the multi-island
@@ -46,6 +50,16 @@ public:
     // Island whose UV triangle covers (u, v), preferring one that is already selected so an
     // island on top of another can still be re-picked. -1 when the point hits nothing.
     int pick(float u, float v) const;
+
+    // Pinning and releasing, for the group that is selected. A pin keeps the island in the
+    // selection, because that is how it is reached again, and takes it out of every tool's reach:
+    // no move, rotation, scale, fit or repack lands on it while it is pinned. The lock belongs to
+    // the session rather than to the layout, so undoing an edit does not move the pins.
+    bool lockSelection();
+    bool unlockSelection();
+    // How much of the selection a tool would actually act on: a drag has to promise that what is
+    // highlighted is what follows the finger, and an all-pinned group follows nothing.
+    size_t movableCount() const;
 
     // Rigid edits applied to the selection. Angles are radians, pivots are in UV space, and a
     // missing selection is reported instead of silently doing nothing.
@@ -58,7 +72,8 @@ public:
     // Move and shrink the selection so it fits the atlas again, keeping its proportions.
     bool fitSelectionToAtlas();
     // Re-pack every island into the atlas with the given texel padding. Island shapes are kept
-    // exactly; only their placement changes.
+    // exactly; only their placement changes. Pinned islands stay where they are and the rest are
+    // shelved around the box they hold.
     bool repack(uint32_t paddingTexels);
 
     // Undo and redo over the edits of this session. A step is the state the session held before an
@@ -105,6 +120,7 @@ private:
     };
 
     bool requireSelection(const char *operation, std::string &error) const;
+    bool setLockedForSelection(bool locked);
     void transformSelection(float angleRadians, float scale, float pivotU, float pivotV,
                             float du, float dv);
     // The same moves without a record in front of them. An operation made of several moves, such as
@@ -122,6 +138,9 @@ private:
     std::vector<float> loadedUvs_;
     UvIslands islands_;
     std::vector<uint32_t> selected_;
+    // One flag per island index. Islands are re-grouped whenever the layout changes, so a flag at
+    // an index that no longer exists is simply never read, and a fresh load pins nothing.
+    std::vector<uint8_t> locked_;
     uint32_t atlasWidth_ = 1024;
     uint32_t atlasHeight_ = 1024;
     std::vector<Step> undo_;

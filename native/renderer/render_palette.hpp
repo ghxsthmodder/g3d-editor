@@ -14,6 +14,7 @@ inline constexpr float kAtlasBackground[4] = {0.1137f, 0.1176f, 0.1255f, 1.0f}; 
 inline constexpr float kAtlasGrid[4] = {0.1922f, 0.2000f, 0.2078f, 1.0f};        // editor_border
 inline constexpr float kAtlasBorder[4] = {0.6078f, 0.6235f, 0.6392f, 1.0f};      // editor_text_dim
 inline constexpr float kAtlasOverlap[4] = {0.9451f, 0.3020f, 0.2980f, 1.0f};     // axis red
+inline constexpr float kAtlasLocked[4] = {0.2157f, 0.5373f, 0.9922f, 1.0f};      // editor_primary
 
 // How much of the surface the 3D preview keeps in the split view. The interface raises it for the
 // plain 3D look and lowers it when the atlas is the subject of the screen.

@@ -262,6 +262,18 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                 true
             }
         }
+        findViewById<View>(R.id.uvLock).setOnClickListener {
+            uvTool(
+                getString(R.string.uv_name_lock),
+                getString(R.string.status_uv_nothing_to_lock)
+            ) { Native.nativeUvLock() }
+        }
+        findViewById<View>(R.id.uvUnlock).setOnClickListener {
+            uvTool(
+                getString(R.string.uv_name_unlock),
+                getString(R.string.status_uv_nothing_locked)
+            ) { Native.nativeUvUnlock() }
+        }
         findViewById<View>(R.id.uvMoveLeft).setOnClickListener { moveIslands(-MOVE_STEP, 0.0f) }
         findViewById<View>(R.id.uvMoveRight).setOnClickListener { moveIslands(MOVE_STEP, 0.0f) }
         findViewById<View>(R.id.uvMoveDown).setOnClickListener { moveIslands(0.0f, -MOVE_STEP) }
@@ -600,10 +612,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     }
 
     /** One tool press: run it, say whether it did anything, and show the new state. */
-    private fun uvTool(name: String, action: () -> Boolean) {
+    private fun uvTool(name: String, nothingDone: String? = null, action: () -> Boolean) {
         if (busy || !uvOpen || !Native.isAvailable) return
         if (!action()) {
-            report(getString(R.string.status_uv_noop, name))
+            report(nothingDone ?: getString(R.string.status_uv_noop, name))
         }
         refreshUvStatus()
         viewport.requestRender()

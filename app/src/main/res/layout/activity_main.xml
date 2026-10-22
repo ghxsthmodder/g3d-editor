@@ -585,6 +585,33 @@
                         android:text="@string/uv_select_none" />
                 </LinearLayout>
 
+                <!-- A pinned island stays put: no move, rotation, scale, fit or repack reaches it.
+                     It keeps the amber outline of the group it was picked with, because that group
+                     is the only way back to it on a touchscreen, and the atlas draws it blue while
+                     the pin is on. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/uvLock"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/uv_lock" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/uvUnlock"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/uv_unlock" />
+                </LinearLayout>
+
                 <CheckBox
                     android:id="@+id/uvAdditive"
                     android:layout_width="match_parent"

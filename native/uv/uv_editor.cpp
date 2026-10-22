@@ -226,6 +226,19 @@ size_t UvEditor::selectionCount() {
     return active_ ? session_.selection().size() : 0u;
 }
 
+bool UvEditor::lockSelection() {
+    return edit([](UvSession &session) { return session.lockSelection(); });
+}
+
+bool UvEditor::unlockSelection() {
+    return edit([](UvSession &session) { return session.unlockSelection(); });
+}
+
+size_t UvEditor::movableCount() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return active_ ? session_.movableCount() : 0u;
+}
+
 bool UvEditor::selectionPivot(float out[2]) {
     std::lock_guard<std::mutex> guard(mutex_);
     float box[4];
@@ -258,6 +271,7 @@ bool UvEditor::layout(UvLayout &out) {
     out.indices.clear();
     out.faceIsland.clear();
     out.selected.clear();
+    out.locked.clear();
     out.islandBounds.clear();
     out.overlapping.clear();
     if (!active_) {
@@ -268,11 +282,16 @@ bool UvEditor::layout(UvLayout &out) {
     out.faceIsland = session_.islands().faceIsland;
     out.selected = session_.selection();
     out.islandBounds.reserve(session_.islands().count() * 4);
+    uint32_t islandIndex = 0;
     for (const UvIsland &island : session_.islands().islands) {
         out.islandBounds.push_back(island.boundsMin[0]);
         out.islandBounds.push_back(island.boundsMin[1]);
         out.islandBounds.push_back(island.boundsMax[0]);
         out.islandBounds.push_back(island.boundsMax[1]);
+        if (session_.isLocked(islandIndex)) {
+            out.locked.push_back(islandIndex);
+        }
+        ++islandIndex;
     }
     out.overlapping = session_.validate().overlapping;
     return true;

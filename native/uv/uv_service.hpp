@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -7,6 +8,37 @@
 #include "core/mesh.hpp"
 
 namespace g3d {
+
+// How far a generation has come, and the request to stop it. xatlas calls its progress function
+// from its own worker threads, so every field is an atomic and the interface only ever reads what
+// the library left there. The caller of generateUv owns one of these.
+class UvProgress {
+public:
+    // Open and close a run, by generateUv. Closing is what tells the screen the number is over,
+    // and opening discards an interrupt that arrived too late for the run it was meant for.
+    void begin();
+    void end();
+    bool running() const { return running_.load(std::memory_order_relaxed) != 0; }
+
+    // Percent for the stage under way, or -1 outside a run: a stale number would restart a
+    // progress bar the interface already closed.
+    int percent() const { return running() ? percent_.load(std::memory_order_relaxed) : -1; }
+    // The stage last reported, by xatlas' own name, empty before the first call. It outlives the
+    // run, so a generation that is over still says what it was last doing.
+    std::string stage() const;
+
+    void requestCancel() { cancel_.store(1, std::memory_order_relaxed); }
+    bool cancelRequested() const { return cancel_.load(std::memory_order_relaxed) != 0; }
+
+    // What the C callback hands over: false is the only way xatlas is told to stop.
+    bool report(int category, int value);
+
+private:
+    std::atomic<int> running_{0};
+    std::atomic<int> percent_{-1};
+    std::atomic<int> category_{-1};
+    std::atomic<int> cancel_{0};
+};
 
 // Subset of xatlas options that make sense to expose in the editor UI.
 struct UvOptions {
@@ -34,7 +66,10 @@ struct UvResult {
 };
 
 // Generates UVs into out. The input mesh is never modified, so existing UVs survive until the
-// caller assigns the result. Returns false and fills error on invalid input or xatlas failure.
-bool generateUv(const Mesh &input, const UvOptions &options, UvResult &out, std::string &error);
+// caller assigns the result. Returns false and fills error on invalid input, on xatlas failure, or
+// when progress was asked to stop and did. The progress report is optional: without it xatlas is
+// left with no callback to call.
+bool generateUv(const Mesh &input, const UvOptions &options, UvResult &out, std::string &error,
+                UvProgress *progress = nullptr);
 
 }  // namespace g3d

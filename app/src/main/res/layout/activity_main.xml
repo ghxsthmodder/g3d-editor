@@ -130,6 +130,45 @@
                         android:typeface="monospace" />
                 </ScrollView>
 
+                <!-- The row a long operation borrows while it lasts: what xatlas reported so far
+                     and the visible way to stop it. An interrupt that lived only in a hidden
+                     gesture would be found by accident, and the row leaves when the work does,
+                     so it costs the canvas nothing while the editor is just being used. -->
+                <LinearLayout
+                    android:id="@+id/workRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="3dp"
+                    android:paddingEnd="3dp"
+                    android:visibility="gone">
+
+                    <ProgressBar
+                        android:id="@+id/workProgress"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="100" />
+
+                    <TextView
+                        android:id="@+id/workText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:textColor="@color/editor_text_dim"
+                        android:textSize="10sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/workCancel"
+                        style="@style/Widget.G3D.Preset"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="@string/work_cancel" />
+                </LinearLayout>
+
                 <TextView
                     android:id="@+id/statusLine"
                     android:layout_width="match_parent"

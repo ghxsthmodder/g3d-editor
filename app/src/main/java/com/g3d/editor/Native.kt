@@ -69,6 +69,20 @@ object Native {
 
     external fun nativeUvGenerate(meshIndex: Int, padding: Int, resolution: Int): String
 
+    /**
+     * What the generation under way has to show: an empty string while nothing is running, and
+     * "<percent>\t<stage>" while it is, the stage being xatlas' own name for the step it is inside
+     * of. Polled from the panel while [nativeUvGenerate] works on its own thread.
+     */
+    external fun nativeUvGenerationProgress(): String
+
+    /**
+     * Asks [nativeUvGenerate] to stop at the next face it is about to take. True when there was a
+     * generation running to be told: the unfinished layout is dropped, so the mesh keeps the UVs it
+     * had and a session that was already open stays exactly where it was.
+     */
+    external fun nativeUvCancelGeneration(): Boolean
+
     external fun nativeUvApply(): String
 
     external fun nativeUvCancel()

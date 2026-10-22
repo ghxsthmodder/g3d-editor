@@ -53,7 +53,7 @@ bool UvEditor::generate(uint32_t meshIndex, const UvOptions &options, std::strin
         return false;
     }
     UvResult generated;
-    if (!generateUv(source, options, generated, error)) {
+    if (!generateUv(source, options, generated, error, &progress_)) {
         return false;
     }
     std::lock_guard<std::mutex> guard(mutex_);
@@ -71,6 +71,22 @@ bool UvEditor::generate(uint32_t meshIndex, const UvOptions &options, std::strin
     active_ = true;
     ++revision_;
     return true;
+}
+
+bool UvEditor::generationProgress(int &percent, std::string &stage) {
+    if (!progress_.running()) {
+        return false;
+    }
+    percent = progress_.percent();
+    stage = progress_.stage();
+    return true;
+}
+
+bool UvEditor::cancelGeneration() {
+    // No lock: the run is what owns the report, and it deliberately happens outside the mutex.
+    const bool running = progress_.running();
+    progress_.requestCancel();
+    return running;
 }
 
 bool UvEditor::apply(std::string &error) {

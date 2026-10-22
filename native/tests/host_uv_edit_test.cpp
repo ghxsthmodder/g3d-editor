@@ -489,8 +489,17 @@ int main() {
     document.withScene([&verticesBefore](g3d::Scene &scene) {
         verticesBefore = scene.meshAt(0)->vertexCount();
     });
+    // Progress is a property of a run: there is nothing to show before one starts, and an interrupt
+    // asked where no run is does not arm the next generation either.
+    int progressPercent = 0;
+    std::string progressStage;
+    check(!editor.generationProgress(progressPercent, progressStage),
+          "sem geracao em andamento nao ha progresso para mostrar");
+    check(!editor.cancelGeneration(), "interromper sem geracao em andamento nao faz nada");
     check(editor.generate(0, generateOptions, editorError),
           "gerar UVs pela interface: " + editorError);
+    check(!editor.generationProgress(progressPercent, progressStage),
+          "a geracao que terminou fecha o proprio progresso");
     check(editor.layout(snapshot) && snapshot.active, "a geracao abre a sessao de preview");
     check(editor.apply(editorError), "aplicar o UV gerado: " + editorError);
     uint32_t verticesAfter = 0;

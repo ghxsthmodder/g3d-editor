@@ -4,6 +4,8 @@ import android.app.ActivityManager
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.view.View
@@ -11,6 +13,7 @@ import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
@@ -42,6 +45,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private val log = StringBuilder()
     private val rows = mutableListOf<View>()
 
+    // Ticks the progress row. The heavy work stays on its own thread and only leaves numbers in the
+    // core, so this is the one place the panel asks what a generation is doing.
+    private val progressHandler = Handler(Looper.getMainLooper())
+
     private var selectedMesh = -1
     private var busy = false
     private var uvOpen = false
@@ -64,6 +71,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var outputScroll: ScrollView
     private lateinit var outputText: TextView
     private lateinit var statusLine: TextView
+    private lateinit var workRow: View
+    private lateinit var workProgress: ProgressBar
+    private lateinit var workText: TextView
+    private lateinit var workCancel: MaterialButton
     private lateinit var importButton: MaterialButton
     private lateinit var frameButton: MaterialButton
     private lateinit var logButton: MaterialButton
@@ -147,6 +158,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         outputScroll = findViewById(R.id.outputScroll)
         outputText = findViewById(R.id.output)
         statusLine = findViewById(R.id.statusLine)
+        workRow = findViewById(R.id.workRow)
+        workProgress = findViewById(R.id.workProgress)
+        workText = findViewById(R.id.workText)
+        workCancel = findViewById(R.id.workCancel)
         importButton = findViewById(R.id.importModel)
         frameButton = findViewById(R.id.frameScene)
         logButton = findViewById(R.id.toggleLog)
@@ -169,6 +184,16 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
         viewport.listener = this
         importButton.setOnClickListener { openModel.launch(arrayOf("*/*")) }
+        // The visible way out of a run, next to the number it reports. A tap that finds no
+        // generation says so instead of pretending it stopped something.
+        workCancel.setOnClickListener {
+            if (Native.nativeUvCancelGeneration()) {
+                workCancel.isEnabled = false
+                workText.text = getString(R.string.work_stopping)
+            } else {
+                report(getString(R.string.work_no_generation))
+            }
+        }
         frameButton.setOnClickListener {
             viewport.frameScene()
             report("câmera ajustada ao conteúdo")
@@ -504,7 +529,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         val mesh = selectedMesh
         val padding = integerField(uvPaddingField, 2)
         val resolution = integerField(uvResolutionField, 0)
-        beginWork(getString(R.string.status_uv_opening, mesh))
+        // The tap that opens the editor also generates a layout when the mesh has none, so the run
+        // this starts may be the one the interrupt button is about.
+        beginWork(getString(R.string.status_uv_opening, mesh), stoppable = true)
         Thread {
             // A mesh imported without UVs has nothing to edit, so the same tap that opens the
             // editor also generates the layout it is about to show.
@@ -547,7 +574,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             report(getString(R.string.status_uv_bad_number))
             return
         }
-        beginWork(getString(R.string.status_uv_generating, padding, resolution))
+        beginWork(getString(R.string.status_uv_generating, padding, resolution), stoppable = true)
         val startedAt = System.currentTimeMillis()
         Thread {
             noteStage("gerando os UVs")
@@ -1445,9 +1472,20 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
     // --- status log ----------------------------------------------------------------------
 
-    private fun beginWork(message: String) {
+    /**
+     * The panel hands the screen to a heavy operation. The log says what started, the row over the
+     * canvas says how far it got, and the button inside it is the visible way out of a run the core
+     * can actually stop. Everything else only gets the bar that moves: an interrupt that reaches
+     * nothing would be a button that lies.
+     */
+    private fun beginWork(message: String, stoppable: Boolean = false) {
         busy = true
         importButton.isEnabled = false
+        workRow.visibility = View.VISIBLE
+        workCancel.visibility = if (stoppable) View.VISIBLE else View.GONE
+        workCancel.isEnabled = true
+        showProgress("")
+        progressHandler.postDelayed(progressTicker, PROGRESS_TICK_MS)
         appendLine(message)
         renderLog()
     }
@@ -1455,9 +1493,45 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun finishWork(message: String) {
         busy = false
         importButton.isEnabled = true
+        progressHandler.removeCallbacks(progressTicker)
+        workRow.visibility = View.GONE
         noteStage(STAGE_CLEAN)
         message.lineSequence().forEach { appendLine(it) }
         renderLog()
+    }
+
+    /** One tick of the row: the generation reports through xatlas, anything else has no number. */
+    private val progressTicker = object : Runnable {
+        override fun run() {
+            if (!busy) {
+                return
+            }
+            showProgress(Native.nativeUvGenerationProgress())
+            progressHandler.postDelayed(this, PROGRESS_TICK_MS)
+        }
+    }
+
+    private fun showProgress(reply: String) {
+        val parts = reply.split('\t')
+        val percent = parts[0].toIntOrNull() ?: -1
+        if (percent < 0) {
+            workProgress.isIndeterminate = true
+            workText.text = getString(R.string.work_running)
+            return
+        }
+        workProgress.isIndeterminate = false
+        workProgress.progress = percent.coerceAtMost(100)
+        val stage = uvStage(parts.getOrNull(1).orEmpty())
+        workText.text = getString(R.string.work_percent, percent, stage)
+    }
+
+    /** xatlas names its stages in English; the panel says them in the words of the editor. */
+    private fun uvStage(stage: String): String = when (stage) {
+        "Adding mesh(es)" -> getString(R.string.work_uv_add)
+        "Computing charts" -> getString(R.string.work_uv_charts)
+        "Packing charts" -> getString(R.string.work_uv_pack)
+        "Building output meshes" -> getString(R.string.work_uv_mesh)
+        else -> stage
     }
 
     /**
@@ -1517,6 +1591,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
         // The width of the inspector column, in the dp the layout file is written in.
         const val INSPECTOR_COLUMN_DP = 216.0f
+
+        // How often the progress row asks the core what the generation reached. Fast enough that a
+        // percentage is seen moving, slow enough that no one notices it is a poll.
+        const val PROGRESS_TICK_MS = 200L
 
         val SUPPORTED_EXTENSIONS = setOf("obj", "gltf", "glb")
         // The three formats Native.nativeExportModel knows, in the order the bridge maps them.

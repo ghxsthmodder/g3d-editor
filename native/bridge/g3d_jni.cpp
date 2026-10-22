@@ -362,6 +362,22 @@ JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeUvGenerate(JNIEnv *en
     }));
 }
 
+// While a generation runs the panel asks what it should be showing. Empty reply for no run at all;
+// otherwise "<percent>\t<stage>", with xatlas' own words for the stage, which the panel names.
+JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeUvGenerationProgress(JNIEnv *env,
+                                                                                jclass) {
+    int percent = -1;
+    std::string stage;
+    if (!g3d::UvEditor::instance().generationProgress(percent, stage)) {
+        return toJString(env, "");
+    }
+    return toJString(env, std::to_string(percent) + "\t" + stage);
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvCancelGeneration(JNIEnv *, jclass) {
+    return g3d::UvEditor::instance().cancelGeneration() ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeUvApply(JNIEnv *env, jclass) {
     std::string error;
     if (!g3d::UvEditor::instance().apply(error)) {

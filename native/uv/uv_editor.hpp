@@ -35,6 +35,13 @@ public:
     // layout. Both are previews: the scene keeps what it had until apply() is called.
     bool begin(uint32_t meshIndex, std::string &error);
     bool generate(uint32_t meshIndex, const UvOptions &options, std::string &error);
+    // What xatlas is doing while the interface waits: the percent of the stage under way and
+    // xatlas' own name for it, or false when no generation is running. Read without the mutex on
+    // purpose: the fields are atomics, and a long run has to stay visible while it lasts.
+    bool generationProgress(int &percent, std::string &stage);
+    // Asks the generation under way to stop, which xatlas does between two faces. False when there
+    // is nothing running, so the button can say what the tap actually did.
+    bool cancelGeneration();
     bool apply(std::string &error);
     void cancel();
     bool isActive();
@@ -108,6 +115,9 @@ private:
 
     UvSession session_;
     std::mutex mutex_;
+    // Belongs to the generation rather than to the session: a run happens before there is anything
+    // to lock around it, and the screen reads it while the worker thread is inside xatlas.
+    UvProgress progress_;
     uint64_t revision_ = 0;
     uint32_t meshIndex_ = 0;
     bool active_ = false;

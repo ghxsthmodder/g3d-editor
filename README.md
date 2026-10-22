@@ -34,7 +34,12 @@ selecionadas. A seleção aceita pino: a ilha bloqueada continua destacada para 
 mas nenhuma ferramenta a alcança, um arrasto cujo grupo inteiro está pinado é recusado e o dedo
 volta para a câmera, e o reempacotamento contorna a caixa que ela ocupa em vez de soterrá-la — o
 azul do preenchimento é o que diz qual está pinada, o contorno âmbar continua dizendo sobre o que o
-clique age, e a linha de estado da aba UV conta `bloqueadas=N`. O comportamento do núcleo é
+clique age, e a linha de estado da aba UV conta `bloqueadas=N`. Gerar UV é a etapa longa, e ela
+agora diz onde está: o xatlas reporta o que faz — preparar a malha, criar as ilhas, empacotar o
+atlas, montar a malha — e uma barra com a porcentagem aparece na faixa sobre a beirada do canvas,
+ao lado do botão **Interromper**, porque cancelar não pode depender de um gesto escondido. Uma
+geração interrompida chega como o que foi pedida — a mensagem diz que foi interrompida, não que
+falhou — e a faixa some com o trabalho, sem gastar um dp do modelo. O comportamento do núcleo é
 comprovado pelos nove testes do host
 (`bash native/tests/run_host_test.sh`), inclusive o renderizador headless, a ida e volta dos três
 formatos de modelo, o desfazer/refazer e a reabertura de um projeto salvo. A fase também tratou dos

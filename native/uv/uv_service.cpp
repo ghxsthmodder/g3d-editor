@@ -8,13 +8,73 @@
 
 namespace g3d {
 
+void UvProgress::begin() {
+    running_.store(1, std::memory_order_relaxed);
+    percent_.store(-1, std::memory_order_relaxed);
+    category_.store(-1, std::memory_order_relaxed);
+    cancel_.store(0, std::memory_order_relaxed);
+}
+
+void UvProgress::end() {
+    running_.store(0, std::memory_order_relaxed);
+}
+
+std::string UvProgress::stage() const {
+    const int category = category_.load(std::memory_order_relaxed);
+    if (category < 0) {
+        return {};
+    }
+    return xatlas::StringForEnum(static_cast<xatlas::ProgressCategory>(category));
+}
+
+bool UvProgress::report(int category, int value) {
+    category_.store(category, std::memory_order_relaxed);
+    percent_.store(value, std::memory_order_relaxed);
+    return cancel_.load(std::memory_order_relaxed) == 0;
+}
+
+namespace {
+
+// xatlas calls this from its worker threads. Returning false is the only way the library offers to
+// stop a run: it abandons the stage, leaving the atlas without an output mesh.
+bool progressCallback(xatlas::ProgressCategory category, int value, void *userData) {
+    if (userData == nullptr) {
+        return true;
+    }
+    return static_cast<UvProgress *>(userData)->report(static_cast<int>(category), value);
+}
+
+// A run opens and closes the report on every way out of generateUv, including the early ones.
+class RunGuard {
+public:
+    explicit RunGuard(UvProgress *progress) : progress_(progress) {
+        if (progress_ != nullptr) {
+            progress_->begin();
+        }
+    }
+    ~RunGuard() {
+        if (progress_ != nullptr) {
+            progress_->end();
+        }
+    }
+    RunGuard(const RunGuard &) = delete;
+    RunGuard &operator=(const RunGuard &) = delete;
+
+private:
+    UvProgress *progress_;
+};
+
+}  // namespace
+
 std::string UvResult::describe() const {
     return "islands=" + std::to_string(chartCount) +
            " atlas=" + std::to_string(atlasWidth) + "x" + std::to_string(atlasHeight) +
            " utilization=" + std::to_string(utilization * 100.0f) + "% " + describeMesh(mesh);
 }
 
-bool generateUv(const Mesh &input, const UvOptions &options, UvResult &out, std::string &error) {
+bool generateUv(const Mesh &input, const UvOptions &options, UvResult &out, std::string &error,
+                UvProgress *progress) {
+    const RunGuard guard(progress);
     std::string reason;
     if (!input.validate(reason)) {
         error = "invalid mesh: " + reason;
@@ -32,6 +92,10 @@ bool generateUv(const Mesh &input, const UvOptions &options, UvResult &out, std:
     if (atlas == nullptr) {
         error = "xatlas: out of memory creating the atlas";
         return false;
+    }
+    if (progress != nullptr) {
+        // Before AddMesh: the mesh itself is one of the stages progress is asked about.
+        xatlas::SetProgressCallback(atlas, &progressCallback, progress);
     }
 
     xatlas::MeshDecl decl;
@@ -75,7 +139,11 @@ bool generateUv(const Mesh &input, const UvOptions &options, UvResult &out, std:
     const bool succeeded = atlas->meshCount > 0 && atlas->meshes[0].vertexCount > 0 &&
                            atlas->meshes[0].indexCount > 0;
     if (!succeeded) {
-        error = "xatlas: no output mesh was produced";
+        // The same empty output either means the library gave up or means it was asked to stop,
+        // and the screen must tell the two apart: one is a failure, the other what was wanted.
+        error = progress != nullptr && progress->cancelRequested()
+                    ? "geracao de UV interrompida"
+                    : "xatlas: no output mesh was produced";
         xatlas::Destroy(atlas);
         return false;
     }

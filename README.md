@@ -3,7 +3,9 @@
 Editor 3D para Android com foco em UV unwrapping (xatlas), edição de ilhas UV e composição de
 texturas por camadas. Veja o [PLAN.md](PLAN.md) para objetivos, escopo e fases.
 
-**Estado:** Fase 5 em curso. A geração e a edição de UVs com xatlas (Fases 2 e 3) e o compositor de
+**Estado:** Fase 5 concluída. O fluxo completo existe — importar o modelo, gerar e editar os UVs,
+compor a textura, salvar o projeto em arquivo e reabri-lo — e nada dele foi validado em telefone.
+A geração e a edição de UVs com xatlas (Fases 2 e 3) e o compositor de
 texturas (Fase 4) — importação de PNG/JPEG, pilha de camadas com posição, rotação, escala, opacidade
 e visibilidade, cor de fundo, prévia da composição no modelo e no atlas, modo quadriculado de
 referência e exportação em PNG — seguem como estavam. O modelo agora sai em **OBJ, glTF e GLB**: a

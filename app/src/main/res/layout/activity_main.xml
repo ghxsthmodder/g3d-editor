@@ -371,6 +371,51 @@
                         android:text="@string/uv_generate" />
                 </LinearLayout>
 
+                <!-- The sizes an atlas is usually authored at. A preset only fills the field
+                     above: applying stays one deliberate tap, because generating replaces the
+                     layout that is already in hand. -->
+                <LinearLayout
+                    android:id="@+id/uvSizePresets"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.G3D.Preset"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="256" />
+
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.G3D.Preset"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="512" />
+
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.G3D.Preset"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="1024" />
+
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.G3D.Preset"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="2048" />
+
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.G3D.Preset"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="4096" />
+                </LinearLayout>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -631,6 +676,50 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
                             android:text="@string/texture_import" />
+                    </LinearLayout>
+
+                    <!-- Squares, since the canvas field takes a single side. Same rule as above:
+                         the number goes into the field, and Tela is what applies it. -->
+                    <LinearLayout
+                        android:id="@+id/textureSizePresets"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            style="@style/Widget.G3D.Preset"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="256" />
+
+                        <com.google.android.material.button.MaterialButton
+                            style="@style/Widget.G3D.Preset"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="512" />
+
+                        <com.google.android.material.button.MaterialButton
+                            style="@style/Widget.G3D.Preset"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="1024" />
+
+                        <com.google.android.material.button.MaterialButton
+                            style="@style/Widget.G3D.Preset"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="2048" />
+
+                        <com.google.android.material.button.MaterialButton
+                            style="@style/Widget.G3D.Preset"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="4096" />
                     </LinearLayout>
 
                     <LinearLayout

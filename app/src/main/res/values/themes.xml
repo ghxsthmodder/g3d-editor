@@ -79,6 +79,15 @@
         <item name="android:paddingRight">8dp</item>
     </style>
 
+    <!-- A size preset: it writes a number into the field beside it, so it is deliberately smaller
+         than the buttons that act. -->
+    <style name="Widget.G3D.Preset" parent="ToolButton.Outlined">
+        <item name="android:textSize">10sp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingLeft">2dp</item>
+        <item name="android:paddingRight">2dp</item>
+    </style>
+
     <!-- Icon-only buttons of the tool rail: a 40dp square with the glyph centred, no text, no
          minimum width from the Material template. The tint comes from a selector so a disabled
          action is unmistakably dimmer than an available one. -->

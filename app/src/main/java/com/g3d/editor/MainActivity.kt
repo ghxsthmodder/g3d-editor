@@ -171,6 +171,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             }
         }
 
+        bindSizePresets(R.id.uvSizePresets, uvResolutionField)
+        bindSizePresets(R.id.textureSizePresets, textureCanvasField)
         uvAdditiveCheck.setOnCheckedChangeListener { _, checked ->
             viewport.additiveSelection = checked
             // Silent while the editor closes, which clears the box as part of resetting the tools.
@@ -336,6 +338,18 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
     private fun hideInspector() {
         inspectorPanel.visibility = View.GONE
+    }
+
+    /**
+     * A preset row only fills the field beside it. Applying stays the button's job: generating UVs
+     * throws away the layout in hand, and resizing a canvas rebuilds the stack behind it.
+     */
+    private fun bindSizePresets(rowId: Int, field: EditText) {
+        val row = findViewById<LinearLayout>(rowId)
+        for (i in 0 until row.childCount) {
+            val preset = row.getChildAt(i) as MaterialButton
+            preset.setOnClickListener { field.setText(preset.text) }
+        }
     }
 
     // --- editor UV -----------------------------------------------------------------------

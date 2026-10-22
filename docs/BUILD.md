@@ -46,7 +46,7 @@ Medidas do último *build* de depuração: `app-debug.apk` de 17,2 MB, com `libg
 de 4,43 MB (arm64-v8a) e 4,31 MB (x86_64). É Debug com símbolos parciais, não Release: o número serve
 para acompanhar a tendência quando algo é incorporado, não como tamanho de distribuição. Os exportadores
 de OBJ e glTF do Assimp, ligados nesta contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais
-da interface são 27 arquivos XML que somam 13 KB de fonte; no APK eles entram no bloco de recursos
+da interface são 29 arquivos XML que somam 13,9 KB de fonte; no APK eles entram no bloco de recursos
 compilados, que não é medido à parte aqui.
 
 ## Conferir a ponte JNI
@@ -64,7 +64,7 @@ diff <(nm -D --defined-only "$SO" | grep -o 'Java_com_g3d_editor_Native_[a-zA-Z_
       sed 's/external fun //' | sort)
 ```
 
-Sem saída, os dois lados batem. São 55 funções declaradas e 55 exportadas neste momento.
+Sem saída, os dois lados batem. São 58 funções declaradas e 58 exportadas neste momento.
 
 ## Testar o núcleo nativo sem dispositivo
 
@@ -80,7 +80,7 @@ CTest (nenhum deles faz parte do APK):
 | `uv_smoke_test` | `host_smoke_test` | geração de UV com xatlas a partir de geometria sintética |
 | `import_test` | `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento |
 | `uv_islands_test` | `host_uv_test` | agrupamento de UVs em ilhas e conectividade |
-| `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, validar, aplicar/cancelar |
+| `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, validar, aplicar/cancelar e o desfazer/refazer, inclusive o arrasto inteiro num passo |
 | `export_test` | `host_export_test` | exportação OBJ/glTF/GLB em memória, ida e volta relida pelo importador: posição, UV e normal por canto, os pares `.gltf`+`.bin` e os avisos de perda |
 | `compose_test` | `host_compose_test` | pilha de camadas: fundo, mover, girar, escalar, opacidade, visibilidade, ordem, duplicar, remover, orçamento de memória e o PNG resultante |
 | `image_test` | `host_image_test` | decodificação PNG/JPEG (stb), ida e volta sem perdas do PNG, paleta com transparência, limite de pixels e quadriculado de referência |

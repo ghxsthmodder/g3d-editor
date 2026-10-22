@@ -42,6 +42,8 @@ editado, simplificado ou reamostrado.
 | `ic_background` | `image/ic_color_lens_24px.svg` | cor de fundo |
 | `ic_close` | `navigation/ic_close_24px.svg` | fechar o inspetor |
 | `ic_flip` | `image/ic_flip_24px.svg` | espelhar ilhas |
+| `ic_undo` | `content/ic_undo_24px.svg` | desfazer a última edição de UV |
+| `ic_redo` | `content/ic_redo_24px.svg` | refazer o que foi desfeito |
 
 Os nomes dos arquivos em `svg/` são os upstream, então a tabela acima é o único lugar onde vive a
 correspondência com os drawables; um glifo novo entra baixando o SVG da mesma tag e acrescentando a

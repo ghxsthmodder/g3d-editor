@@ -59,6 +59,8 @@
     <string name="uv_scale_up">1,25×</string>
     <string name="uv_fit">Ajustar</string>
     <string name="uv_repack">Reempacotar</string>
+    <string name="uv_undo">Desfazer</string>
+    <string name="uv_redo">Refazer</string>
     <string name="uv_frame_atlas">Reenquadrar UV</string>
     <string name="uv_apply">Aplicar</string>
     <string name="uv_cancel">Cancelar</string>
@@ -84,6 +86,8 @@
     <string name="status_uv_apply_failed">não foi possível aplicar: %1$s</string>
     <string name="status_uv_cancelled">edição cancelada: os UVs da malha não mudaram</string>
     <string name="status_uv_noop">%1$s não fez nada: selecione uma ilha no atlas primeiro</string>
+    <string name="status_uv_no_undo">nada para desfazer nesta edição</string>
+    <string name="status_uv_no_redo">nada para refazer nesta edição</string>
     <string name="status_uv_pick">ilha %1$d selecionada</string>
     <string name="status_uv_pick_add">ilha %1$d somada à seleção</string>
     <string name="status_uv_pick_miss">toque não encontrou nenhuma ilha</string>

@@ -13,9 +13,11 @@ interface seguiu a proposta do protótipo: paleta de grafite, rail de glifos Mat
 lugar das duas barras de texto, inspetor com as abas Cena | UV | Camadas, atlas dominante quando a
 edição é dele (3D fica com ~22% da tela) e arrastar com um dedo move as ilhas selecionadas. O
 comportamento do núcleo é comprovado pelos oito testes do host
-(`bash native/tests/run_host_test.sh`), inclusive o renderizador headless e a ida e volta dos três
-formatos; o layout novo e a gravação no SAF ainda não foram validados em telefone. Salvamento de
-projeto e desfazer/refazer (Fase 5) ainda não existem.
+(`bash native/tests/run_host_test.sh`), inclusive o renderizador headless, a ida e volta dos três
+formatos e o desfazer/refazer da sessão de UV — um arrasto é um passo, e uma geração pode ser desfeita
+até o layout que veio do arquivo. O layout novo e a gravação no SAF ainda não foram validados em
+telefone. Salvamento de projeto (Fase 5) ainda não existe; o desfazer hoje cobre a edição de UV
+aberta, não o documento inteiro.
 
 ## Compilar
 

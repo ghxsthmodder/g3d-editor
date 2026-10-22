@@ -240,6 +240,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             uvTool(getString(R.string.uv_name_fit)) { Native.nativeUvFit() }
         }
         findViewById<View>(R.id.uvRepack).setOnClickListener { repackIslands() }
+        findViewById<View>(R.id.uvUndo).setOnClickListener { stepHistory(forward = false) }
+        findViewById<View>(R.id.uvRedo).setOnClickListener { stepHistory(forward = true) }
         findViewById<View>(R.id.uvFrameAtlas).setOnClickListener {
             viewport.frameAtlas()
             report("atlas reenquadrado")
@@ -533,6 +535,24 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         if (busy || !uvOpen) return
         val padding = integerField(uvPaddingField, 2).coerceAtLeast(1)
         uvTool(getString(R.string.uv_name_repack)) { Native.nativeUvRepack(padding) }
+    }
+
+    /**
+     * One step back or forward over the edits of the session. Not uvTool: a history press that does
+     * nothing has run out of steps, which is not the missing selection the tools complain about.
+     */
+    private fun stepHistory(forward: Boolean) {
+        if (busy || !uvOpen || !Native.isAvailable) return
+        val moved = if (forward) Native.nativeUvRedo() else Native.nativeUvUndo()
+        if (!moved) {
+            report(
+                getString(
+                    if (forward) R.string.status_uv_no_redo else R.string.status_uv_no_undo
+                )
+            )
+        }
+        refreshUvStatus()
+        viewport.requestRender()
     }
 
     private fun refreshUvStatus() {

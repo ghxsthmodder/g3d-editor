@@ -157,6 +157,7 @@ class ModelView @JvmOverloads constructor(
                 dragDistance = tapSlopPx + 1f
                 // A second finger turns the gesture into pan or zoom, whatever it started on.
                 grabResolved = true
+                if (draggingIslands) Native.nativeUvEndGesture()
                 draggingIslands = false
             }
 
@@ -239,12 +240,15 @@ class ModelView @JvmOverloads constructor(
                     // The grab may have re-selected without a tap, and the drag edited the session.
                     post { listener?.onIslandsMoved() }
                 }
+                // The lift is where one undo step ends: everything the swipe did is one move.
+                if (draggingIslands) Native.nativeUvEndGesture()
                 dragDistance = 0f
                 grabResolved = false
                 draggingIslands = false
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                if (draggingIslands) Native.nativeUvEndGesture()
                 dragDistance = 0f
                 grabResolved = false
                 draggingIslands = false

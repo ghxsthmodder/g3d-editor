@@ -384,6 +384,35 @@
                     android:textColor="@color/editor_text_dim"
                     android:textSize="11sp" />
 
+                <!-- Undo and redo sit above the tools they step over, because a drag on the atlas
+                     is as editable as a button is and the finger that made it is already gone. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/uvUndo"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/uv_undo"
+                        app:icon="@drawable/ic_undo"
+                        app:iconGravity="textStart" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/uvRedo"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/uv_redo"
+                        app:icon="@drawable/ic_redo"
+                        app:iconGravity="textStart" />
+                </LinearLayout>
+
                 <TextView
                     style="@style/Widget.G3D.SectionLabel"
                     android:text="@string/uv_generate_title" />

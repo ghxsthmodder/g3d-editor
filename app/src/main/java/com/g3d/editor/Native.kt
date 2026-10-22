@@ -77,6 +77,17 @@ object Native {
 
     external fun nativeUvRepack(padding: Int): Boolean
 
+    /**
+     * Steps back and forth over the edits of the open session. A drag of the atlas is one step: the
+     * grab opened it and [nativeUvEndGesture] closes it, so the five moves of a swipe are undone
+     * together. Applying the layout closes the history, which then belongs to the document.
+     */
+    external fun nativeUvUndo(): Boolean
+
+    external fun nativeUvRedo(): Boolean
+
+    external fun nativeUvEndGesture()
+
     // --- vista e atlas ---
 
     external fun nativeViewSetMode(mode: Int)

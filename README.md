@@ -19,7 +19,11 @@ do caminho em que o modelo foi encontrado — o formato está descrito em [docs/
 O desfazer e o refazer cobrem a sessão de UV: um arrasto é um passo, e uma geração pode ser desfeita
 até o layout que veio do arquivo. A interface seguiu a proposta do protótipo: paleta de grafite, rail
 de glifos Material vendorizados no lugar das duas barras de texto, inspetor com as abas Cena | UV |
-Camadas, atlas dominante quando a edição é dele (3D fica com ~22% da tela) e arrastar com um dedo
+Camadas **feito gaveta na beirada de baixo e fechado por padrão** — num telefone o lado escasso é a
+largura, e o atlas é um quadrado: com a coluna lateral de 216 dp aberta sobrava um quadrado de 72 dp
+de lado, com a gaveta ele mede 291 dp (aritmética de uma tela de 360×800 dp, ainda não conferida no
+aparelho) —, atlas dominante quando a edição é dele e, como a superfície agora se divide pelo lado
+curto, cada painel fica com a largura toda (em pé, 3D em cima e atlas embaixo) e arrastar com um dedo
 move as ilhas selecionadas. O comportamento do núcleo é comprovado pelos nove testes do host
 (`bash native/tests/run_host_test.sh`), inclusive o renderizador headless, a ida e volta dos três
 formatos de modelo, o desfazer/refazer e a reabertura de um projeto salvo. A fase também tratou dos

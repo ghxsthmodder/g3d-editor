@@ -26,7 +26,7 @@ public:
 
     enum {
         kViewThreeDimensional = 0,  // The atlas is hidden and the 3D view fills the surface.
-        kViewSplit = 1,             // 3D on the left, atlas on the right.
+        kViewSplit = 1,             // The two share the surface, divided along its short side.
         kViewAtlasOnly = 2          // The atlas fills the surface.
     };
 

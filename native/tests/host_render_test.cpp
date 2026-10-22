@@ -394,6 +394,37 @@ int main() {
           "uma razao absurda e limitada, razao=" + std::to_string(renderer.splitRatio()));
     renderer.setSplitRatio(g3d::kDefaultSplitRatio);
 
+    // --- a tall surface is divided along its height --------------------------------------
+    // The phone holds the editor in portrait and the inspector gave up its column of width, so the
+    // surface is now taller than it is wide. Two panels side by side there would each be measured
+    // by half of the short side; stacked, both keep every pixel across and the atlas square grows.
+    // The bound below is 80% of the width because the atlas keeps a margin of its own in the panel.
+    renderer.onSurfaceChanged(360, 640);
+    renderer.setSplitRatio(g3d::kAtlasDominantSplitRatio);
+    int atlasFirst = -1;
+    int atlasLast = -1;
+    for (int x = 0; x < 360; ++x) {
+        float point[2] = {-1.0f, -1.0f};
+        if (!renderer.uvAt(static_cast<float>(x) + 0.5f, 400.0f, point)) {
+            continue;
+        }
+        if (atlasFirst < 0) {
+            atlasFirst = x;
+        }
+        atlasLast = x;
+    }
+    const int atlasSpan = atlasLast - atlasFirst + 1;
+    check(atlasSpan * 100 >= 360 * 80,
+          "em pe o atlas e medido pela largura quase toda, alcance=" + std::to_string(atlasSpan));
+    check(atlasFirst > 0 && atlasFirst + atlasLast == 359,
+          "o quadrado do atlas fica centrado na tela, primeiro=" + std::to_string(atlasFirst) +
+              " ultimo=" + std::to_string(atlasLast));
+    float stripUv[2] = {-1.0f, -1.0f};
+    check(!renderer.uvAt(180.0f, 30.0f, stripUv),
+          "a faixa de cima e do modelo: ali o toque nao cai no atlas");
+    renderer.onSurfaceChanged(kSize, kSize);
+    renderer.setSplitRatio(g3d::kDefaultSplitRatio);
+
     // --- the atlas maps taps back to UV coordinates --------------------------------------
     // Sampled before the message is built: reading the output array inside check() would let the
     // compiler evaluate the text first and print the previous sample.

@@ -33,14 +33,13 @@ editado, simplificado ou reamostrado.
 | `ic_duplicate` | `content/ic_content_copy_24px.svg` | duplicar camada |
 | `ic_delete` | `action/ic_delete_24px.svg` | remover camada |
 | `ic_add` | `content/ic_add_24px.svg` | adicionar |
-| `ic_arrow_up` | `navigation/ic_arrow_upward_24px.svg` | mover para cima |
-| `ic_arrow_down` | `navigation/ic_arrow_downward_24px.svg` | mover para baixo |
+| `ic_arrow_up` | `navigation/ic_arrow_upward_24px.svg` | mover para cima, abrir o log, mostrar a gaveta do inspetor |
+| `ic_arrow_down` | `navigation/ic_arrow_downward_24px.svg` | mover para baixo, esconder o log, esconder a gaveta do inspetor |
 | `ic_arrow_back` | `navigation/ic_arrow_back_24px.svg` | mover para a esquerda |
 | `ic_arrow_forward` | `navigation/ic_arrow_forward_24px.svg` | mover para a direita |
 | `ic_diagnostic` | `action/ic_bug_report_24px.svg` | diagnóstico de UV |
 | `ic_canvas` | `action/ic_aspect_ratio_24px.svg` | tamanho da tela |
 | `ic_background` | `image/ic_color_lens_24px.svg` | cor de fundo |
-| `ic_close` | `navigation/ic_close_24px.svg` | fechar o inspetor |
 | `ic_flip` | `image/ic_flip_24px.svg` | espelhar ilhas |
 | `ic_undo` | `content/ic_undo_24px.svg` | desfazer a última edição de UV |
 | `ic_redo` | `content/ic_redo_24px.svg` | refazer o que foi desfeito |

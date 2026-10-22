@@ -88,18 +88,18 @@ licença e os arquivos mantidos.
 
 ## Material Icons
 
-- Finalidade: glifos dos botões do rail de ferramentas e do inspetor.
+- Finalidade: glifos dos botões do rail de ferramentas e das abas do inspetor.
 - Repositório: https://github.com/google/material-design-icons
 - Versão: tag `3.0.1`.
 - Licença: Apache-2.0 (`material-icons/LICENSE`).
-- Arquivos mantidos: `material-icons/svg/` com 29 SVGs upstream de 24 px, mais
+- Arquivos mantidos: `material-icons/svg/` com 28 SVGs upstream de 24 px, mais
   `material-icons/README.md`, que é a tabela que liga cada glifo ao drawable gerado e à ação que ele
   representa no editor.
 - Como entram: o traçado é copiado sem edição em `app/src/main/res/drawable/ic_*.xml`; o preenchimento
   preto veda em `@android:color/white` porque quem define a cor é o `iconTint` do botão. Nada de
   reamostragem, simplificação ou redesenho.
-- Tamanho adicionado: os 29 SVGs guardados somam 8,7 KB; os 29 drawables XML gerados a partir deles
-  somam 13,9 KB. No APK eles entram no bloco de recursos compilados, que não foi medido separadamente.
+- Tamanho adicionado: os 28 SVGs guardados somam 8,3 KB; os 28 drawables XML gerados a partir deles
+  somam 13,2 KB. No APK eles entram no bloco de recursos compilados, que não foi medido separadamente.
 
 ## meshoptimizer
 

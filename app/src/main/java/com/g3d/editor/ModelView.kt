@@ -10,11 +10,12 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * 3D viewport, and the atlas panel the renderer draws next to it. One finger orbits the model, and on
- * the atlas it drags the islands that are selected, or pans the view when nothing is. Two fingers
- * pan, pinch zooms, a tap selects a mesh or a UV island. Which of the two a gesture belongs to is
- * decided by where it started, asked from the native side.
- * Every call that touches GL or the native camera is posted to the GL thread with queueEvent.
+ * 3D viewport, and the atlas panel the renderer draws beside it or under it, whichever way the
+ * surface is divided. One finger orbits the model, and on the atlas it drags the islands that are
+ * selected, or pans the view when nothing is. Two fingers pan, pinch zooms, a tap selects a mesh or
+ * a UV island. Which of the two a gesture belongs to is decided by where it started, asked from the
+ * native side. Every call that touches GL or the native camera is posted to the GL thread with
+ * queueEvent.
  */
 class ModelView @JvmOverloads constructor(
     context: Context,
@@ -112,7 +113,7 @@ class ModelView @JvmOverloads constructor(
     }
 
     /**
-     * How much of the surface the 3D preview keeps while the atlas is beside it. Like the view mode
+     * How much of the surface the 3D preview keeps while the atlas shares it. Like the view mode
      * this only reads state under a mutex, so the UI thread can call it directly.
      */
     fun setSplitRatio(ratio: Float) {

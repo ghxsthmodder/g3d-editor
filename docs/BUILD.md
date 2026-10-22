@@ -42,13 +42,14 @@ Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembl
 dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
 não é necessário.
 
-Medidas do último *build* de depuração: `app-debug.apk` de 17,7 MB, com `libg3dnative.so` despojado
-de 5,11 MB (arm64-v8a) e 4,96 MB (x86_64). O módulo de projeto traz o RapidJSON que já vinha com o
+Medidas do último *build* de depuração: `app-debug.apk` de 19.665.972 bytes (18,8 MiB), com
+`libg3dnative.so` despojado de 5.133.864 bytes (arm64-v8a) e 4.978.416 bytes (x86_64), os dois
+empacotados sem compressão. O módulo de projeto traz o RapidJSON que já vinha com o
 Assimp (cabeçalhos, instanciados onde o projeto é escrito e lido), e é dele boa parte desse aumento.
 É Debug com símbolos parciais, não Release: o número serve para acompanhar a tendência quando algo é
 incorporado, não como tamanho de distribuição. Os exportadores de OBJ e glTF do Assimp, ligados nesta
-contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais da interface são 29 arquivos XML que
-somam 13,9 KB de fonte; no APK eles entram no bloco de recursos compilados, que não é medido à parte
+contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais da interface são 28 arquivos XML que
+somam 13,5 KB de fonte; no APK eles entram no bloco de recursos compilados, que não é medido à parte
 aqui.
 
 ## Conferir a ponte JNI
@@ -87,7 +88,7 @@ CTest (nenhum deles faz parte do APK):
 | `compose_test` | `host_compose_test` | pilha de camadas: fundo, mover, girar, escalar, opacidade, visibilidade, ordem, duplicar, remover, as duas recusas de tela (limite da GPU e orçamento de megapixels), a conta de memória retida com a imagem composta e o PNG resultante |
 | `project_test` | `host_project_test` | container `.g3dp`: escrita e leitura, cabeçalho cortado, mágica errada, versão futura, bloco desalinhado, arquivo truncado, e a ida e volta do editor inteiro — UVs aplicados byte a byte, tela, fundo, ordem, posição, giro, escala, opacidade e visibilidade das camadas |
 | `image_test` | `host_image_test` | decodificação PNG/JPEG (stb), ida e volta sem perdas do PNG, paleta com transparência, limite de pixels e quadriculado de referência |
-| `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer: vista 3D, vista 2D do atlas, a textura composta aplicada nos dois modos e o `GL_MAX_TEXTURE_SIZE` do driver publicado como limite de tela do compositor |
+| `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer: vista 3D, vista 2D do atlas, a divisão da superfície pelo lado curto (em pé os dois painéis ficam um sobre o outro e o atlas mede-se pela largura quase toda), a textura composta aplicada nos dois modos e o `GL_MAX_TEXTURE_SIZE` do driver publicado como limite de tela do compositor |
 
 `render_test` só é construído quando o host tem EGL + OpenGL ES 3 (`libegl-dev`,
 `libgles-dev`/Mesa). Ele usa a plataforma *surfaceless* do Mesa e, quando não há contexto

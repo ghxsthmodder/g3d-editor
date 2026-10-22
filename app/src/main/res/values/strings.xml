@@ -18,7 +18,8 @@
     <string name="tab_uv">UV</string>
     <string name="tab_layers">Camadas</string>
     <string name="cd_log">mostrar ou ocultar o registro</string>
-    <string name="cd_close_inspector">fechar o inspetor</string>
+    <string name="cd_close_inspector">esconder as ferramentas do inspetor</string>
+    <string name="cd_open_inspector">mostrar as ferramentas do inspetor</string>
     <string name="hierarchy_title">Hierarquia</string>
     <string name="viewport_hint">toque seleciona · arrasta orbita ou move a ilha · 2 dedos movem · pinça aproxima</string>
     <string name="diagnostic_uv">Diagnóstico de UV</string>

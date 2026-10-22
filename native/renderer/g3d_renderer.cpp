@@ -642,22 +642,38 @@ void Renderer::rectOf(int part, int out[4]) const {
     out[1] = 0;
     out[2] = 0;
     out[3] = 0;
-    const int split = static_cast<int>(static_cast<float>(surfaceWidth) * ratio);
+    // A portrait phone is short in width and long in height, and the atlas is a square: splitting
+    // the width takes the side the square is measured by and leaves the other half empty. So the
+    // split follows the short side — stacked here, side by side when the surface is wide.
+    const bool stacked = surfaceHeight > surfaceWidth;
+    const int split = static_cast<int>(
+        static_cast<float>(stacked ? surfaceHeight : surfaceWidth) * ratio);
     if (part == 0) {
         if (mode == kViewAtlasOnly) {
             return;
         }
-        out[2] = mode == kViewSplit ? split : surfaceWidth;
-        out[3] = surfaceHeight;
+        if (mode != kViewSplit) {
+            out[2] = surfaceWidth;
+            out[3] = surfaceHeight;
+            return;
+        }
+        out[2] = stacked ? surfaceWidth : split;
+        out[3] = stacked ? split : surfaceHeight;
         return;
     }
     if (mode == kViewThreeDimensional) {
         return;
     }
     if (mode == kViewSplit) {
-        out[0] = split;
-        out[2] = std::max(surfaceWidth - split, 1);
-        out[3] = surfaceHeight;
+        if (stacked) {
+            out[1] = split;
+            out[2] = surfaceWidth;
+            out[3] = std::max(surfaceHeight - split, 1);
+        } else {
+            out[0] = split;
+            out[2] = std::max(surfaceWidth - split, 1);
+            out[3] = surfaceHeight;
+        }
         return;
     }
     out[2] = surfaceWidth;

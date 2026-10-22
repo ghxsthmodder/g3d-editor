@@ -178,7 +178,19 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         findViewById<View>(R.id.exportGlb).setOnClickListener { startModelExport(FORMAT_GLB) }
         findViewById<View>(R.id.projectSave).setOnClickListener { startProjectSave() }
         findViewById<View>(R.id.projectOpen).setOnClickListener { pickProject() }
-        findViewById<View>(R.id.closeInspector).setOnClickListener { hideInspector() }
+        findViewById<View>(R.id.toggleInspector).setOnClickListener {
+            if (inspectorPanel.visibility == View.VISIBLE) {
+                hideInspector()
+            } else {
+                showInspectorTab(
+                    when (inspectorTabs.checkedButtonId) {
+                        R.id.tabUv -> InspectorTab.Uv
+                        R.id.tabLayers -> InspectorTab.Layers
+                        else -> InspectorTab.Scene
+                    }
+                )
+            }
+        }
         inspectorTabs.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
                 applyInspectorTab(
@@ -191,6 +203,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             }
         }
         inspectorTabs.check(R.id.tabScene)
+        // Scene is the tab the app starts on, and the drawer starts folded under it: the model and
+        // its atlas get every pixel of width the phone has until the user asks for a tool.
+        hideInspector()
         applyLogButton()
         logButton.setOnClickListener { toggleLog() }
         findViewById<View>(R.id.openUvEditor).setOnClickListener { openUvEditor() }
@@ -382,6 +397,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
     private fun applyInspectorTab(tab: InspectorTab) {
         inspectorPanel.visibility = View.VISIBLE
+        updateInspectorToggle(true)
         hierarchyPanel.visibility = if (tab == InspectorTab.Scene) View.VISIBLE else View.GONE
         uvPanel.visibility = if (tab == InspectorTab.Uv) View.VISIBLE else View.GONE
         texturePanel.visibility = if (tab == InspectorTab.Layers) View.VISIBLE else View.GONE
@@ -394,9 +410,24 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         }
     }
 
+    /**
+     * Folds the tools away. The tab row stays: on a phone the canvas is what the app is for,
+     * and the drawer that covers it has to be closable without hunting for a glyph. The split ratio
+     * is left alone, because which of the two pictures fills the screen is the chips' business and
+     * nobody folds a panel away to be shown a different view.
+     */
     private fun hideInspector() {
         inspectorPanel.visibility = View.GONE
-        viewport.setSplitRatio(SPLIT_MODEL)
+        updateInspectorToggle(false)
+    }
+
+    /** The arrow points the way the drawer moves, so the strip says what is under it. */
+    private fun updateInspectorToggle(open: Boolean) {
+        val button = findViewById<MaterialButton>(R.id.toggleInspector)
+        button.setIconResource(if (open) R.drawable.ic_arrow_down else R.drawable.ic_arrow_up)
+        val label = getString(if (open) R.string.cd_close_inspector else R.string.cd_open_inspector)
+        button.contentDescription = label
+        button.tooltipText = label
     }
 
     /**

@@ -228,79 +228,89 @@
                 </com.google.android.material.button.MaterialButtonToggleGroup>
             </LinearLayout>
         </FrameLayout>
+    </LinearLayout>
 
-        <!-- One inspector with tabs. The old bar pushed hierarchy, UV and textures through a single
-             slot, so two of the three toolboxes were always hidden behind a tap that gave no hint
-             of what would come next. -->
+    <!-- One inspector with tabs, under the canvas instead of beside it. A phone is scarce in width
+     and loose in height, and the atlas is a square: a 216 dp column took the side the model cannot
+     do without and gave the tools a space too narrow to show them. The panel now spends height, and
+     the tab row stays on screen even with the tools folded away: a panel that only a rail glyph
+     can open is a panel nobody finds. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/editor_panel"
+        android:orientation="vertical">
+
         <LinearLayout
-            android:id="@+id/inspectorPanel"
-            android:layout_width="216dp"
-            android:layout_height="match_parent"
-            android:background="@color/editor_panel"
-            android:orientation="vertical">
+            android:layout_width="match_parent"
+            android:layout_height="30dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="30dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/inspectorTabs"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                app:selectionRequired="true"
+                app:singleSelection="true">
 
-                <com.google.android.material.button.MaterialButtonToggleGroup
-                    android:id="@+id/inspectorTabs"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/tabScene"
+                    style="@style/Widget.G3D.Tab"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    app:selectionRequired="true"
-                    app:singleSelection="true">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/tabScene"
-                        style="@style/Widget.G3D.Tab"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:text="@string/tab_scene" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/tabUv"
-                        style="@style/Widget.G3D.Tab"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:text="@string/tab_uv" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/tabLayers"
-                        style="@style/Widget.G3D.Tab"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:text="@string/tab_layers" />
-                </com.google.android.material.button.MaterialButtonToggleGroup>
+                    android:text="@string/tab_scene" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/closeInspector"
-                    style="@style/Widget.G3D.Icon"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:contentDescription="@string/cd_close_inspector"
-                    android:tooltipText="@string/cd_close_inspector"
-                    app:icon="@drawable/ic_close"
-                    app:iconSize="18dp" />
-            </LinearLayout>
+                    android:id="@+id/tabUv"
+                    style="@style/Widget.G3D.Tab"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="@string/tab_uv" />
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/tabLayers"
+                    style="@style/Widget.G3D.Tab"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="@string/tab_layers" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
 
-            <LinearLayout
+            <!-- The arrow is the state: it points at the edge the tools move to. The tabs choose
+                 which tools are under it, so this one button serves all three panels. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/toggleInspector"
+                style="@style/Widget.G3D.Icon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@string/cd_open_inspector"
+                android:tooltipText="@string/cd_open_inspector"
+                app:icon="@drawable/ic_arrow_up"
+                app:iconSize="18dp" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/inspectorPanel"
+            android:layout_width="match_parent"
+            android:layout_height="210dp"
+            android:visibility="gone">
+
+            <ScrollView
                 android:id="@+id/hierarchyPanel"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@color/editor_panel"
-                android:orientation="vertical"
-                android:padding="6dp">
+                android:fillViewport="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="6dp">
 
                 <TextView
                     style="@style/Widget.G3D.SectionLabel"
@@ -328,8 +338,7 @@
                 <LinearLayout
                     android:id="@+id/hierarchyList"
                     android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
                     android:orientation="vertical" />
 
                 <!-- Three named buttons, not a glyph: the format decides which files land in the
@@ -401,16 +410,22 @@
                         android:layout_weight="1"
                         android:text="@string/project_save" />
                 </LinearLayout>
-            </LinearLayout>
+                </LinearLayout>
+            </ScrollView>
 
-            <LinearLayout
+            <ScrollView
                 android:id="@+id/uvPanel"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@color/editor_panel"
-                android:orientation="vertical"
-                android:padding="6dp"
+                android:fillViewport="true"
                 android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="6dp">
 
                 <TextView
                     style="@style/Widget.G3D.SectionLabel"
@@ -739,10 +754,11 @@
                         android:layout_weight="1"
                         android:text="@string/uv_apply" />
                 </LinearLayout>
-            </LinearLayout>
+                </LinearLayout>
+            </ScrollView>
 
             <!-- The compositor: the stack on top, the tools of the selected layer below. It scrolls
-                 because a phone cannot show eleven controls at 232 dp without stealing the model. -->
+                 because the drawer is 210 dp of height and eleven controls do not fit in it. -->
             <ScrollView
                 android:id="@+id/texturePanel"
                 android:layout_width="match_parent"
@@ -1082,6 +1098,5 @@
                 </LinearLayout>
             </ScrollView>
         </FrameLayout>
-        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

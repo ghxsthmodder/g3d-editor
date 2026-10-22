@@ -5,8 +5,6 @@
 
     <string name="import_model">Importar</string>
     <string name="frame_scene">Reenquadrar</string>
-    <string name="label_shading">Sombra:</string>
-    <string name="label_view">Vista:</string>
     <string name="shading_solid">Sólido</string>
     <string name="shading_normals">Normais</string>
     <string name="shading_texture">Textura</string>
@@ -16,12 +14,14 @@
     <string name="view_atlas">UV</string>
     <string name="open_uv_editor">Editor UV</string>
     <string name="open_texture">Texturas</string>
-    <string name="toggle_panel">Painel</string>
-    <string name="toggle_log">Log ▾</string>
-    <string name="toggle_log_hidden">Log ▸</string>
+    <string name="tab_scene">Cena</string>
+    <string name="tab_uv">UV</string>
+    <string name="tab_layers">Camadas</string>
+    <string name="cd_log">mostrar ou ocultar o registro</string>
+    <string name="cd_close_inspector">fechar o inspetor</string>
     <string name="hierarchy_title">Hierarquia</string>
     <string name="viewport_hint">toque seleciona · arrasta orbita · 2 dedos movem · pinça aproxima</string>
-    <string name="menu_native_diagnostic">Diagnóstico de UV (fase 1)</string>
+    <string name="diagnostic_uv">Diagnóstico de UV</string>
 
     <string name="uv_title">Editor UV</string>
     <string name="uv_generate_title">Geração</string>

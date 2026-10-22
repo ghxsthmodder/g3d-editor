@@ -4,8 +4,6 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.view.Menu
-import android.view.MenuItem
 import android.view.View
 import android.widget.CheckBox
 import android.widget.EditText
@@ -45,6 +43,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private var selectedLayer = -1
 
     private lateinit var viewport: ModelView
+    private lateinit var inspectorPanel: View
+    private lateinit var inspectorTabs: MaterialButtonToggleGroup
     private lateinit var hierarchyPanel: View
     private lateinit var hierarchyList: LinearLayout
     private lateinit var sceneSummary: TextView
@@ -95,6 +95,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         setSupportActionBar(findViewById(R.id.toolbar))
 
         viewport = findViewById(R.id.viewport)
+        inspectorPanel = findViewById(R.id.inspectorPanel)
+        inspectorTabs = findViewById(R.id.inspectorTabs)
         hierarchyPanel = findViewById(R.id.hierarchyPanel)
         hierarchyList = findViewById(R.id.hierarchyList)
         sceneSummary = findViewById(R.id.sceneSummary)
@@ -126,7 +128,21 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             viewport.frameScene()
             report("câmera ajustada ao conteúdo")
         }
-        findViewById<View>(R.id.togglePanel).setOnClickListener { toggleSidePanel() }
+        findViewById<View>(R.id.nativeDiagnostic).setOnClickListener { runUvDiagnostic() }
+        findViewById<View>(R.id.closeInspector).setOnClickListener { hideInspector() }
+        inspectorTabs.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                applyInspectorTab(
+                    when (checkedId) {
+                        R.id.tabUv -> InspectorTab.Uv
+                        R.id.tabLayers -> InspectorTab.Layers
+                        else -> InspectorTab.Scene
+                    }
+                )
+            }
+        }
+        inspectorTabs.check(R.id.tabScene)
+        applyLogButton()
         logButton.setOnClickListener { toggleLog() }
         findViewById<View>(R.id.openUvEditor).setOnClickListener { openUvEditor() }
         shadingGroup.check(R.id.shadingSolid)
@@ -264,11 +280,6 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         refreshHierarchy()
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu)
-        return true
-    }
-
     // GLSurfaceView needs the lifecycle forwarded, or its render thread keeps running while the
     // activity is stopped.
     override fun onResume() {
@@ -281,44 +292,50 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         super.onPause()
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.menuNativeDiagnostic) {
-            runUvDiagnostic()
-            return true
-        }
-        return super.onOptionsItemSelected(item)
-    }
-
     // --- side panels ---------------------------------------------------------------------
+
+    /** Which of the three toolboxes the inspector is showing. */
+    private enum class InspectorTab { Scene, Uv, Layers }
 
     /** The log is the least important strip on the screen, so it can get out of the way. */
     private fun toggleLog() {
         logVisible = !logVisible
         outputScroll.visibility = if (logVisible) View.VISIBLE else View.GONE
-        logButton.setText(if (logVisible) R.string.toggle_log else R.string.toggle_log_hidden)
+        applyLogButton()
     }
 
-    /** The right column shows the hierarchy, the UV tools or the texture stack, never two at once. */
-    private fun toggleSidePanel() {
-        when {
-            hierarchyPanel.visibility == View.VISIBLE -> {
-                hierarchyPanel.visibility = View.GONE
-                if (uvOpen) uvPanel.visibility = View.VISIBLE else texturePanel.visibility = View.VISIBLE
-            }
-            uvPanel.visibility == View.VISIBLE -> {
-                uvPanel.visibility = View.GONE
-                texturePanel.visibility = View.VISIBLE
-            }
-            texturePanel.visibility == View.VISIBLE -> {
-                texturePanel.visibility = View.GONE
-                hierarchyPanel.visibility = View.VISIBLE
-            }
-            else -> hierarchyPanel.visibility = View.VISIBLE
+    /** The arrow points the way the strip is about to move, which is what the label says too. */
+    private fun applyLogButton() {
+        logButton.setIconResource(if (logVisible) R.drawable.ic_arrow_up else R.drawable.ic_arrow_down)
+        logButton.contentDescription = getString(R.string.cd_log)
+    }
+
+    /**
+     * Asks the tab row to switch, so the row and the panels can never disagree. When the tab is
+     * already the checked one no event comes, and the caller still expects its tools to be ready.
+     */
+    private fun showInspectorTab(tab: InspectorTab) {
+        val button = when (tab) {
+            InspectorTab.Scene -> R.id.tabScene
+            InspectorTab.Uv -> R.id.tabUv
+            InspectorTab.Layers -> R.id.tabLayers
         }
-        if (texturePanel.visibility == View.VISIBLE) {
+        if (inspectorTabs.checkedButtonId == button) applyInspectorTab(tab) else inspectorTabs.check(button)
+    }
+
+    private fun applyInspectorTab(tab: InspectorTab) {
+        inspectorPanel.visibility = View.VISIBLE
+        hierarchyPanel.visibility = if (tab == InspectorTab.Scene) View.VISIBLE else View.GONE
+        uvPanel.visibility = if (tab == InspectorTab.Uv) View.VISIBLE else View.GONE
+        texturePanel.visibility = if (tab == InspectorTab.Layers) View.VISIBLE else View.GONE
+        if (tab == InspectorTab.Layers) {
             showAtlasForTextures()
             refreshTextureStack()
         }
+    }
+
+    private fun hideInspector() {
+        inspectorPanel.visibility = View.GONE
     }
 
     // --- editor UV -----------------------------------------------------------------------
@@ -326,8 +343,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun openUvEditor() {
         if (busy || !Native.isAvailable) return
         if (uvOpen) {
-            uvPanel.visibility = View.VISIBLE
-            hierarchyPanel.visibility = View.GONE
+            showInspectorTab(InspectorTab.Uv)
             return
         }
         if (selectedMesh < 0) {
@@ -356,8 +372,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                 }
                 uvOpen = true
                 uvMesh = mesh
-                hierarchyPanel.visibility = View.GONE
-                uvPanel.visibility = View.VISIBLE
+                showInspectorTab(InspectorTab.Uv)
                 viewport.frameAtlas()
                 viewport.setViewMode(VIEW_SPLIT)
                 viewGroup.check(R.id.viewSplit)
@@ -439,8 +454,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         uvMesh = -1
         viewport.additiveSelection = false
         uvAdditiveCheck.isChecked = false
-        uvPanel.visibility = View.GONE
-        hierarchyPanel.visibility = View.VISIBLE
+        showInspectorTab(InspectorTab.Scene)
         viewport.setViewMode(VIEW_THREE_D)
         viewGroup.check(R.id.viewThreeD)
     }
@@ -505,11 +519,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
     private fun openTexturePanel() {
         if (!Native.isAvailable) return
-        hierarchyPanel.visibility = View.GONE
-        uvPanel.visibility = View.GONE
-        texturePanel.visibility = View.VISIBLE
-        showAtlasForTextures()
-        refreshTextureStack()
+        showInspectorTab(InspectorTab.Layers)
     }
 
     /** The compositor paints the atlas, so the panel is useless without the 2D view. */

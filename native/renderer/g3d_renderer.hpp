@@ -9,6 +9,8 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
+#include "renderer/render_palette.hpp"
+
 namespace g3d {
 
 struct Mesh;

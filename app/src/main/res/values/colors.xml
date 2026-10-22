@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="editor_background">#0F1115</color>
-    <color name="editor_panel">#16191F</color>
-    <color name="editor_text">#D6DEE8</color>
-    <color name="editor_text_dim">#8E9AAC</color>
-    <color name="overlay_background">#B30F1115</color>
+    <!-- Graphite tokens, converted from the oklch palette of the prototype interface. They are the
+         same values the native renderer clears and draws with, so the GL surface and the panels do
+         not meet as two different greys. -->
+    <color name="editor_background">#131416</color>
+    <color name="editor_panel">#1D1E20</color>
+    <color name="editor_surface_high">#2C2E31</color>
+    <color name="editor_border">#313335</color>
+    <color name="editor_viewport">#161719</color>
+    <color name="editor_text">#E3E5E7</color>
+    <color name="editor_text_dim">#9B9FA3</color>
+    <color name="editor_primary">#3789FD</color>
+    <color name="editor_primary_text">#FCFCFC</color>
+    <color name="overlay_background">#B3131416</color>
     <color name="hierarchy_selected">#22303F</color>
-    <color name="selection_accent">#F8B838</color>
+    <color name="selection_accent">#F1AB34</color>
 </resources>

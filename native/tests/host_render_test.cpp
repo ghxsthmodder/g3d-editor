@@ -29,7 +29,13 @@
 namespace {
 
 constexpr int kSize = 64;
-constexpr float kBackground[3] = {0.094f, 0.106f, 0.125f};
+// Read from the renderer instead of being written again here: an assertion against a copy of a
+// colour would pass while the screen changed.
+using g3d::kAtlasBorder;
+using g3d::kAtlasGrid;
+using g3d::kAtlasOverlap;
+using g3d::kBackground;
+using g3d::kOutlineColor;
 
 int failures = 0;
 int checks = 0;
@@ -259,7 +265,8 @@ int main() {
     renderer.draw();
     const std::vector<unsigned char> outlined = readPixels();
     maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "selecao", outlined);
-    const int outlinePixels = countClose(outlined, 0.98f, 0.72f, 0.22f);
+    const int outlinePixels =
+        countClose(outlined, kOutlineColor[0], kOutlineColor[1], kOutlineColor[2]);
     check(outlinePixels > 0, "contorno da malha selecionada aparece, pixels=" +
                                  std::to_string(outlinePixels));
 
@@ -279,9 +286,6 @@ int main() {
     // --- the atlas layer -----------------------------------------------------------------
     // The split puts 55% of the surface on the 3D preview, so the atlas owns columns 35..63.
     constexpr int kAtlasLeft = static_cast<int>(static_cast<float>(kSize) * 0.55f);
-    constexpr float kGrid[3] = {0.239f, 0.263f, 0.310f};
-    constexpr float kBorder[3] = {0.478f, 0.518f, 0.584f};
-    constexpr float kOverlap[3] = {0.898f, 0.267f, 0.239f};
 
     g3d::UvEditor &editor = g3d::UvEditor::instance();
     std::string editError;
@@ -305,7 +309,8 @@ int main() {
     // Islands that claim the same UV space must be impossible to miss in the atlas.
     std::printf("      atlas: %s\n", editor.report().c_str());
     const int overlapPixels =
-        countColorIn(split, kAtlasLeft, kSize, kOverlap[0], kOverlap[1], kOverlap[2], 8.0f);
+        countColorIn(split, kAtlasLeft, kSize, kAtlasOverlap[0], kAtlasOverlap[1],
+                                         kAtlasOverlap[2], 8.0f);
     check(overlapPixels > 0,
           "ilhas sobrepostas aparecem em vermelho, pixels=" + std::to_string(overlapPixels));
 
@@ -355,13 +360,14 @@ int main() {
     }
 
     // --- selecting an island repaints it --------------------------------------------------
-    const int amberBefore = countColorIn(split, kAtlasLeft, kSize, 0.98f, 0.72f, 0.22f, 8.0f);
+    const int amberBefore = countColorIn(split, kAtlasLeft, kSize, kOutlineColor[0],
+                                         kOutlineColor[1], kOutlineColor[2], 8.0f);
     check(editor.select(0, false), "selecionar a primeira ilha funciona");
     renderer.draw();
     const std::vector<unsigned char> selectedAtlas = readPixels();
     maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "ilha", selectedAtlas);
-    const int amberAfter =
-        countColorIn(selectedAtlas, kAtlasLeft, kSize, 0.98f, 0.72f, 0.22f, 8.0f);
+    const int amberAfter = countColorIn(selectedAtlas, kAtlasLeft, kSize, kOutlineColor[0],
+                                        kOutlineColor[1], kOutlineColor[2], 8.0f);
     check(amberAfter > amberBefore,
           "a ilha selecionada aparece em ambar, antes=" + std::to_string(amberBefore) +
               " depois=" + std::to_string(amberAfter));
@@ -387,12 +393,13 @@ int main() {
     const std::vector<unsigned char> repacked = readPixels();
     maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "repack", repacked);
     const int overlapAfterRepack =
-        countColorIn(repacked, kAtlasLeft, kSize, kOverlap[0], kOverlap[1], kOverlap[2], 8.0f);
+        countColorIn(repacked, kAtlasLeft, kSize, kAtlasOverlap[0], kAtlasOverlap[1],
+                     kAtlasOverlap[2], 8.0f);
     check(overlapAfterRepack == 0,
           "reagrupadas, nenhuma ilha aparece em vermelho, pixels=" +
               std::to_string(overlapAfterRepack));
-    const int amberRepacked =
-        countColorIn(repacked, kAtlasLeft, kSize, 0.98f, 0.72f, 0.22f, 8.0f);
+    const int amberRepacked = countColorIn(repacked, kAtlasLeft, kSize, kOutlineColor[0],
+                                           kOutlineColor[1], kOutlineColor[2], 8.0f);
     check(amberRepacked > 0,
           "a selecao continua visivel depois de reagrupar, pixels=" +
               std::to_string(amberRepacked));
@@ -422,11 +429,11 @@ int main() {
     renderer.draw();
     const std::vector<unsigned char> atlasEmpty = readPixels();
     maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "vazio", atlasEmpty);
-    check(countColorIn(atlasEmpty, 0, kSize, kGrid[0], kGrid[1], kGrid[2]) > 0,
+    check(countColorIn(atlasEmpty, 0, kSize, kAtlasGrid[0], kAtlasGrid[1], kAtlasGrid[2]) > 0,
           "a grade do atlas aparece sem edicao aberta");
-    check(countColorIn(atlasEmpty, 0, kSize, kBorder[0], kBorder[1], kBorder[2]) > 0,
+    check(countColorIn(atlasEmpty, 0, kSize, kAtlasBorder[0], kAtlasBorder[1], kAtlasBorder[2]) > 0,
           "a borda do atlas aparece sem edicao aberta");
-    check(countColorIn(atlasEmpty, 0, kSize, kOverlap[0], kOverlap[1], kOverlap[2], 8.0f) == 0,
+    check(countColorIn(atlasEmpty, 0, kSize, kAtlasOverlap[0], kAtlasOverlap[1], kAtlasOverlap[2], 8.0f) == 0,
           "sem edicao aberta nao ha aviso de sobreposicao");
     // The whole surface is the atlas now, so its centre moved to the centre of the surface.
     const AtlasSample emptyCentre = sample(centreY, centreY);

@@ -1,4 +1,5 @@
 #include "renderer/g3d_renderer.hpp"
+#include "renderer/render_palette.hpp"
 #include "texture/texture_studio.hpp"
 
 #include <algorithm>
@@ -37,13 +38,7 @@ namespace {
 constexpr const char *kTag = "G3DRender";
 #endif
 constexpr float kFovDegrees = 45.0f;
-constexpr float kBackground[3] = {0.094f, 0.106f, 0.125f};
-constexpr float kOutlineColor[4] = {0.98f, 0.72f, 0.22f, 1.0f};
 constexpr float kPi = 3.14159265358979323846f;
-constexpr float kAtlasBackground[4] = {0.133f, 0.153f, 0.184f, 1.0f};
-constexpr float kAtlasGrid[4] = {0.239f, 0.263f, 0.310f, 1.0f};
-constexpr float kAtlasBorder[4] = {0.478f, 0.518f, 0.584f, 1.0f};
-constexpr float kAtlasOverlap[4] = {0.898f, 0.267f, 0.239f, 1.0f};
 // The atlas square keeps a little margin so its border is never glued to the edge of the panel.
 constexpr float kAtlasMarginRatio = 0.92f;
 // Two triangles drawn before everything else, so the grid and the islands have something to sit on.

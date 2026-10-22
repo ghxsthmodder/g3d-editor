@@ -1,10 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- The Material colour attributes are pointed at the graphite tokens so every checkable
+         Material widget (toggle groups, icon buttons, seek bars) inherits the palette instead of
+         the default purple, and the pressed/checked states stay legible on the panels. -->
     <style name="Theme.G3DEditor" parent="Theme.Material3.Dark.NoActionBar">
         <item name="android:windowBackground">@color/editor_background</item>
         <item name="android:statusBarColor">@color/editor_background</item>
         <item name="android:navigationBarColor">@color/editor_background</item>
         <item name="android:textColorPrimary">@color/editor_text</item>
+        <item name="colorPrimary">@color/editor_primary</item>
+        <item name="colorOnPrimary">@color/editor_primary_text</item>
+        <item name="colorPrimaryContainer">@color/editor_primary</item>
+        <item name="colorSurface">@color/editor_panel</item>
+        <item name="colorSurfaceContainer">@color/editor_panel</item>
+        <item name="colorSurfaceContainerHigh">@color/editor_surface_high</item>
+        <item name="colorSurfaceContainerHighest">@color/editor_surface_high</item>
+        <item name="colorOnSurface">@color/editor_text</item>
+        <item name="colorOnSurfaceVariant">@color/editor_text_dim</item>
+        <item name="colorOutline">@color/editor_border</item>
+        <item name="colorOutlineVariant">@color/editor_border</item>
+        <item name="android:colorControlHighlight">#33FFFFFF</item>
     </style>
 
     <!-- The tool rows must not eat the space the model and the atlas need, so the buttons are as
@@ -40,5 +55,55 @@
         <item name="android:minHeight">0dp</item>
         <item name="android:paddingLeft">10dp</item>
         <item name="android:paddingRight">10dp</item>
+    </style>
+
+    <!-- Section headings inside the panels: small, dim, upper case, the way the prototype labels
+         each block of controls. -->
+    <style name="Widget.G3D.SectionLabel" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">2dp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">@color/editor_text_dim</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.08</item>
+    </style>
+
+    <!-- Tabs of the inspector. Checked tabs come out in the primary colour because the theme points
+         colorPrimary at it and MaterialButton is checkable. -->
+    <style name="Widget.G3D.Tab" parent="ToolButton.Outlined">
+        <item name="android:textSize">11sp</item>
+        <item name="android:paddingLeft">8dp</item>
+        <item name="android:paddingRight">8dp</item>
+    </style>
+
+    <!-- Icon-only buttons of the tool rail: a 40dp square with the glyph centred, no text, no
+         minimum width from the Material template. The tint comes from a selector so a disabled
+         action is unmistakably dimmer than an available one. -->
+    <style name="Widget.G3D.Icon" parent="Widget.Material3.Button.IconButton">
+        <item name="android:layout_width">40dp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:padding">0dp</item>
+        <item name="iconSize">24dp</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconTint">@color/icon_tint</item>
+    </style>
+
+    <!-- The same square, but it holds a mode: it carries a background and a glyph colour of its own
+         while checked, because the rail has no other way to say which mode is on. -->
+    <style name="Widget.G3D.Icon.Mode" parent="Widget.G3D.Icon">
+        <item name="android:checkable">true</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="backgroundTint">@color/mode_background</item>
+        <item name="iconTint">@color/mode_icon</item>
+        <item name="strokeColor">@color/editor_border</item>
+        <item name="strokeWidth">1dp</item>
     </style>
 </resources>

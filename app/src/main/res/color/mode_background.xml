@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A rail button that holds a mode is invisible until it holds it: only the checked one gets the
+     filled container, so the eye finds the current mode without a label. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true" android:color="@color/editor_primary" />
+    <item android:color="@android:color/transparent" />
+</selector>

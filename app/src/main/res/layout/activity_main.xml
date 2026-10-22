@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="horizontal">
 
     <!-- No title bar: the app is one screen, and the 56dp the toolbar spent showing its own name is
      height the model and the atlas use. -->
@@ -11,8 +11,8 @@
     <!-- The viewport keeps whatever the rail and the inspector do not need: the model and its
          atlas are the point of the screen, so the chrome is a column and two chips. -->
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
         android:layout_weight="1"
         android:orientation="horizontal">
 
@@ -230,14 +230,18 @@
         </FrameLayout>
     </LinearLayout>
 
-    <!-- One inspector with tabs, under the canvas instead of beside it. A phone is scarce in width
-     and loose in height, and the atlas is a square: a 216 dp column took the side the model cannot
-     do without and gave the tools a space too narrow to show them. The panel now spends height, and
-     the tab row stays on screen even with the tools folded away: a panel that only a rail glyph
-     can open is a panel nobody finds. -->
+    <!-- One inspector with tabs, in a column on the right. The screen this app runs on is locked to
+     landscape — 2400 × 1080 px, about 960 × 432 dp — so height is the side a phone is short of and
+     width is the side it can spend, and the atlas is a square measured by whichever of the two is
+     smaller. A drawer under the canvas took 210 dp of the scarce side and left the atlas with 151;
+     the column spends the loose one and the atlas keeps the whole height, tools open or shut.
+     Folded, the column is the arrow alone — 28 dp of edge with a name on it — because a closed
+     inspector that still holds 216 dp beside the canvas is the same waste wearing a different hat,
+     and a panel nobody can see the way back into is a panel nobody opens. -->
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:id="@+id/inspectorDock"
+        android:layout_width="216dp"
+        android:layout_height="match_parent"
         android:background="@color/editor_panel"
         android:orientation="vertical">
 
@@ -289,14 +293,15 @@
                 android:layout_height="28dp"
                 android:contentDescription="@string/cd_open_inspector"
                 android:tooltipText="@string/cd_open_inspector"
-                app:icon="@drawable/ic_arrow_up"
+                app:icon="@drawable/ic_arrow_back"
                 app:iconSize="18dp" />
         </LinearLayout>
 
         <FrameLayout
             android:id="@+id/inspectorPanel"
             android:layout_width="match_parent"
-            android:layout_height="210dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:visibility="gone">
 
             <ScrollView
@@ -758,7 +763,8 @@
             </ScrollView>
 
             <!-- The compositor: the stack on top, the tools of the selected layer below. It scrolls
-                 because the drawer is 210 dp of height and eleven controls do not fit in it. -->
+                 because the column is 216 dp wide and the phone's height does not hold eleven
+                 controls at that width. -->
             <ScrollView
                 android:id="@+id/texturePanel"
                 android:layout_width="match_parent"

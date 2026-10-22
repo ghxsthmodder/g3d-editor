@@ -22,12 +22,14 @@ fundo e a pilha inteira, um passo por clique —, e como as imagens das camadas 
 passo não copia pixel nenhum: desfazer uma remoção traz de volta a mesma imagem que estava lá. A
 interface seguiu a proposta do protótipo: paleta de grafite, rail
 de glifos Material vendorizados no lugar das duas barras de texto, inspetor com as abas Cena | UV |
-Camadas **feito gaveta na beirada de baixo e fechado por padrão** — num telefone o lado escasso é a
-largura, e o atlas é um quadrado: com a coluna lateral de 216 dp aberta sobrava um quadrado de 72 dp
-de lado, com a gaveta ele mede 291 dp (aritmética de uma tela de 360×800 dp, ainda não conferida no
-aparelho) —, atlas dominante quando a edição é dele e, como a superfície agora se divide pelo lado
-curto, cada painel fica com a largura toda (em pé, 3D em cima e atlas embaixo) e arrastar com um dedo
-move as ilhas selecionadas. O comportamento do núcleo é comprovado pelos nove testes do host
+Camadas **feito coluna à direita, fechada por padrão** — a tela deste app é travada em paisagem
+(2400 × 1080 px, ~960 × 432 dp), então o lado escasso do telefone é a altura e o atlas é um quadrado
+medido pelo menor dos dois: a coluna gasta 216 dp de largura, o lado que sobra, e o quadrado do
+atlas mede ~372 dp de lado com as ferramentas abertas ou fechadas; uma gaveta na beirada de baixo
+gastaria 210 dp da altura e deixaria o atlas com 151 dp (aritmética de tela, ainda não conferida no
+aparelho) —, atlas dominante quando a edição é dele, a superfície dividida pelo seu lado curto e
+arrastar com um dedo move as ilhas selecionadas. O comportamento do núcleo é comprovado pelos nove
+testes do host
 (`bash native/tests/run_host_test.sh`), inclusive o renderizador headless, a ida e volta dos três
 formatos de modelo, o desfazer/refazer e a reabertura de um projeto salvo. A fase também tratou dos
 limites: a **tela do compositor não passa do `GL_MAX_TEXTURE_SIZE`** que o driver informou (as

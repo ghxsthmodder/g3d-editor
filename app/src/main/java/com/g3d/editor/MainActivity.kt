@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.view.View
+import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -203,7 +204,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             }
         }
         inspectorTabs.check(R.id.tabScene)
-        // Scene is the tab the app starts on, and the drawer starts folded under it: the model and
+        // Scene is the tab the app starts on and the column starts folded beside it: the model and
         // its atlas get every pixel of width the phone has until the user asks for a tool.
         hideInspector()
         applyLogButton()
@@ -413,20 +414,33 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     }
 
     /**
-     * Folds the tools away. The tab row stays: on a phone the canvas is what the app is for,
-     * and the drawer that covers it has to be closable without hunting for a glyph. The split ratio
-     * is left alone, because which of the two pictures fills the screen is the chips' business and
-     * nobody folds a panel away to be shown a different view.
+     * Folds the tools away, leaving the arrow: the canvas is what the app is for, and the column
+     * that takes it has to be closable without hunting for a glyph. The split ratio is left alone,
+     * because which of the two pictures fills the screen is the chips' business and nobody folds a
+     * panel away to be shown a different view.
      */
     private fun hideInspector() {
         inspectorPanel.visibility = View.GONE
         updateInspectorToggle(false)
     }
 
-    /** The arrow points the way the drawer moves, so the strip says what is under it. */
+    /**
+     * The arrow points the way the column moves, so the tab row says what is behind it. Folded, the
+     * column keeps only that arrow: 28 dp of edge instead of 216 dp of empty panel beside the
+     * canvas, which is the waste the column was meant to stop.
+     */
     private fun updateInspectorToggle(open: Boolean) {
         val button = findViewById<MaterialButton>(R.id.toggleInspector)
-        button.setIconResource(if (open) R.drawable.ic_arrow_down else R.drawable.ic_arrow_up)
+        button.setIconResource(if (open) R.drawable.ic_arrow_forward else R.drawable.ic_arrow_back)
+        findViewById<View>(R.id.inspectorTabs).visibility = if (open) View.VISIBLE else View.GONE
+        val dock = findViewById<View>(R.id.inspectorDock)
+        val metrics = dock.layoutParams
+        metrics.width = if (open) {
+            (INSPECTOR_COLUMN_DP * resources.displayMetrics.density + 0.5f).toInt()
+        } else {
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        }
+        dock.layoutParams = metrics
         val label = getString(if (open) R.string.cd_close_inspector else R.string.cd_open_inspector)
         button.contentDescription = label
         button.tooltipText = label
@@ -1488,6 +1502,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         // the atlas share the screen evenly until one of them becomes the subject.
         const val SPLIT_MODEL = 0.55f
         const val SPLIT_ATLAS = 0.22f
+
+        // The width of the inspector column, in the dp the layout file is written in.
+        const val INSPECTOR_COLUMN_DP = 216.0f
 
         val SUPPORTED_EXTENSIONS = setOf("obj", "gltf", "glb")
         // The three formats Native.nativeExportModel knows, in the order the bridge maps them.

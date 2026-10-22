@@ -81,6 +81,7 @@ object Native {
 
     external fun nativeViewSetMode(mode: Int)
 
+    external fun nativeSetSplitRatio(ratio: Float)
     external fun nativeUvPan(dx: Float, dy: Float)
 
     external fun nativeUvZoom(factor: Float)

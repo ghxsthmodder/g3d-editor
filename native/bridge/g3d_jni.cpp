@@ -336,6 +336,11 @@ JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeViewSetMode(JNIEnv *, jc
     g3d::Renderer::instance().setViewMode(mode);
 }
 
+JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeSetSplitRatio(JNIEnv *, jclass,
+                                                                      jfloat ratio) {
+    g3d::Renderer::instance().setSplitRatio(ratio);
+}
+
 JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeUvPan(JNIEnv *, jclass, jfloat dx,
                                                               jfloat dy) {
     g3d::Renderer::instance().uvPan(dx, dy);

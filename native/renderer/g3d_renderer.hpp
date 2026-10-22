@@ -64,6 +64,10 @@ public:
     // the exported texture changes.
     void setUvOverlayVisible(bool visible);
     bool uvOverlayVisible() const;
+    // How much of the surface the 3D preview keeps in the split view. The interface lowers it when
+    // the atlas is the subject of the screen and raises it back when the model is.
+    void setSplitRatio(float ratio);
+    float splitRatio() const;
     void uvPan(float dxPixels, float dyPixels);
     void uvZoom(float factor);
     void uvFrame();
@@ -153,6 +157,7 @@ private:
     float uvPanX_ = 0.0f;
     float uvPanY_ = 0.0f;
     int viewMode_ = kViewThreeDimensional;
+    float splitRatio_ = kDefaultSplitRatio;
     bool uvOverlayVisible_ = true;
 
     // Guards everything the UI thread may change while the GL thread is drawing: the 3D camera, the

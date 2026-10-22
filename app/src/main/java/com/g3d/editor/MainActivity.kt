@@ -330,6 +330,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         hierarchyPanel.visibility = if (tab == InspectorTab.Scene) View.VISIBLE else View.GONE
         uvPanel.visibility = if (tab == InspectorTab.Uv) View.VISIBLE else View.GONE
         texturePanel.visibility = if (tab == InspectorTab.Layers) View.VISIBLE else View.GONE
+        viewport.setSplitRatio(if (tab == InspectorTab.Scene) SPLIT_MODEL else SPLIT_ATLAS)
         if (tab == InspectorTab.Layers) {
             showAtlasForTextures()
             refreshTextureStack()
@@ -338,6 +339,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
     private fun hideInspector() {
         inspectorPanel.visibility = View.GONE
+        viewport.setSplitRatio(SPLIT_MODEL)
     }
 
     /**
@@ -1006,6 +1008,11 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     }
 
     private companion object {
+        // The two widths the surface is divided with, mirroring render_palette.hpp: the model and
+        // the atlas share the screen evenly until one of them becomes the subject.
+        const val SPLIT_MODEL = 0.55f
+        const val SPLIT_ATLAS = 0.22f
+
         val SUPPORTED_EXTENSIONS = setOf("obj", "gltf", "glb")
         val SUPPORTED_IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg")
         val OPACITY_PATTERN = Regex("op=(\\d+)%")

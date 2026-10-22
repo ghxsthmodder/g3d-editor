@@ -623,17 +623,19 @@ void Renderer::rectOf(int part, int out[4]) const {
     int surfaceWidth = 1;
     int surfaceHeight = 1;
     int mode = kViewThreeDimensional;
+    float ratio = kDefaultSplitRatio;
     {
         std::lock_guard<std::mutex> guard(cameraMutex_);
         surfaceWidth = width_;
         surfaceHeight = height_;
         mode = viewMode_;
+        ratio = splitRatio_;
     }
     out[0] = 0;
     out[1] = 0;
     out[2] = 0;
     out[3] = 0;
-    const int split = static_cast<int>(static_cast<float>(surfaceWidth) * 0.55f);
+    const int split = static_cast<int>(static_cast<float>(surfaceWidth) * ratio);
     if (part == 0) {
         if (mode == kViewAtlasOnly) {
             return;
@@ -935,6 +937,18 @@ void Renderer::setUvOverlayVisible(bool visible) {
 bool Renderer::uvOverlayVisible() const {
     std::lock_guard<std::mutex> guard(cameraMutex_);
     return uvOverlayVisible_;
+}
+
+void Renderer::setSplitRatio(float ratio) {
+    std::lock_guard<std::mutex> guard(cameraMutex_);
+    // Either panel can be given less than a tenth of the surface and become unusable, so the
+    // interface can ask for a ratio and get one it can actually work with.
+    splitRatio_ = std::min(std::max(ratio, 0.1f), 0.9f);
+}
+
+float Renderer::splitRatio() const {
+    std::lock_guard<std::mutex> guard(cameraMutex_);
+    return splitRatio_;
 }
 
 void Renderer::setViewMode(int mode) {

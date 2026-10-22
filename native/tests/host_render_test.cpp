@@ -284,8 +284,9 @@ int main() {
     check(moved > 100, "orbitar muda a imagem, canais=" + std::to_string(moved));
 
     // --- the atlas layer -----------------------------------------------------------------
-    // The split puts 55% of the surface on the 3D preview, so the atlas owns columns 35..63.
-    constexpr int kAtlasLeft = static_cast<int>(static_cast<float>(kSize) * 0.55f);
+    // Where the atlas starts is whatever the renderer says, so the assertion below reads the number
+    // the surface was actually divided with instead of a copy of it.
+    const int kAtlasLeft = static_cast<int>(static_cast<float>(kSize) * renderer.splitRatio());
 
     g3d::UvEditor &editor = g3d::UvEditor::instance();
     std::string editError;
@@ -313,6 +314,28 @@ int main() {
                                          kAtlasOverlap[2], 8.0f);
     check(overlapPixels > 0,
           "ilhas sobrepostas aparecem em vermelho, pixels=" + std::to_string(overlapPixels));
+
+    // --- the atlas can take the bigger part of the surface ---------------------------------
+    renderer.setSplitRatio(g3d::kAtlasDominantSplitRatio);
+    const int narrowLeft = static_cast<int>(static_cast<float>(kSize) * renderer.splitRatio());
+    renderer.draw();
+    const std::vector<unsigned char> dominant = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "atlas_dominante", dominant);
+    const int dominantPixels = countOtherThanIn(dominant, narrowLeft, kSize, kBackground[0],
+                                                kBackground[1], kBackground[2]);
+    check(dominantPixels > atlasPixels,
+          "o atlas cresce quando e o assunto da tela, antes=" + std::to_string(atlasPixels) +
+              " depois=" + std::to_string(dominantPixels));
+    const int sliverPixels = countOtherThanIn(dominant, 0, narrowLeft, kBackground[0],
+                                              kBackground[1], kBackground[2]);
+    check(sliverPixels > 0 && narrowLeft < kAtlasLeft,
+          "a vista 3D encolhe mas continua mostrando o modelo, pixels=" +
+              std::to_string(sliverPixels));
+    // A ratio that would erase one of the panels is brought back to one that works.
+    renderer.setSplitRatio(4.0f);
+    check(renderer.splitRatio() <= 0.9f && renderer.splitRatio() >= 0.1f,
+          "uma razao absurda e limitada, razao=" + std::to_string(renderer.splitRatio()));
+    renderer.setSplitRatio(g3d::kDefaultSplitRatio);
 
     // --- the atlas maps taps back to UV coordinates --------------------------------------
     // Sampled before the message is built: reading the output array inside check() would let the

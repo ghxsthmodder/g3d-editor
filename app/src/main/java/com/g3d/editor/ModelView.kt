@@ -101,6 +101,16 @@ class ModelView @JvmOverloads constructor(
         requestRender()
     }
 
+    /**
+     * How much of the surface the 3D preview keeps while the atlas is beside it. Like the view mode
+     * this only reads state under a mutex, so the UI thread can call it directly.
+     */
+    fun setSplitRatio(ratio: Float) {
+        if (!Native.isAvailable) return
+        Native.nativeSetSplitRatio(ratio)
+        requestRender()
+    }
+
     fun frameAtlas() {
         if (!Native.isAvailable) return
         Native.nativeUvFrame()

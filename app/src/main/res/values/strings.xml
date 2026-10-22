@@ -205,4 +205,24 @@
     <string name="memory_line">memória retida: %1$s MB (arquivo %2$s · malhas %3$s · camadas %4$s · edição %5$s · histórico %6$s)</string>
     <string name="memory_empty">memória retida: 0 MB</string>
     <string name="status_interrupted_stage">a sessão anterior parou em: %1$s</string>
+
+    <!-- Os textos de licença são arquivos em app/src/main/assets/licenses; estas linhas dizem de
+         onde veio cada um e o que no app ele cobre. -->
+    <string name="license_title">Licenças</string>
+    <string name="license_close">Fechar</string>
+    <string name="license_intro">O editor carrega código de terceiros dentro do binário. O que segue
+        são os arquivos de licença como vieram, copiados sem alteração: um resumo de uma licença não
+        é a licença.</string>
+    <string name="license_assimp">Assimp v6.0.5 — BSD-3-Clause — importação e exportação de modelos
+        (OBJ, glTF, GLB)</string>
+    <string name="license_rapidjson">RapidJSON, dos contrib do Assimp — MIT — leitura e escrita do
+        projeto .g3dp</string>
+    <string name="license_xatlas">xatlas f700c77 — MIT — geração de UV e empacotamento do
+        atlas</string>
+    <string name="license_stb">stb a7d4c21 — domínio público ou MIT, à nossa escolha — leitura e
+        escrita de PNG e JPEG</string>
+    <string name="license_glm">GLM 1.0.2 — MIT (ou Happy Bunny) — câmera e transformações</string>
+    <string name="license_apache">Material Icons 3.0.1, Material Components 1.12.0 e as bibliotecas
+        AndroidX e Kotlin — Apache License 2.0 — a interface e tudo que o Gradle traz; o texto é um
+        só e vale para todas</string>
 </resources>

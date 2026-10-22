@@ -60,9 +60,11 @@ arquivos por onde o editor passou também está: **Recentes**, ao lado de Abrir 
 cinco últimos com o nome e com o tipo que eram, e reabre cada um pelo caminho que o abriu da
 primeira vez — projeto ou modelo, decidido no registro e não pela extensão, porque o provedor
 devolve nomes sem ela. A cessão que o seletor deu é pedida de forma que sobreviva ao fechamento do
-app, e a linha
-de um arquivo que o aparelho não deixa mais ler sai da lista antes de ser oferecida, com a mensagem
-dizendo quantos saíram: prometer um arquivo que não abre é a mesma mentira de um botão que não age.
+app, e a linha de um arquivo que o aparelho não deixa mais ler sai da lista antes de ser oferecida,
+com a mensagem dizendo quantos saíram: prometer um arquivo que não abre é a mesma mentira de um
+botão que não age. Os avisos de licença que a distribuição tem de levar também já estão no app: seis
+textos, cada um o arquivo que veio com a biblioteca, empacotados como *asset* e lidos de lá por um
+diálogo que abre no glifo do *rail* — a tela mostra o que o APK carrega porque é do APK que ela lê.
 O layout novo, o salvamento, a leitura via SAF e a lista de recentes ainda não foram validados em
 telefone.
 
@@ -82,4 +84,6 @@ Requisitos e detalhes em [docs/BUILD.md](docs/BUILD.md).
 - `third_party/` — bibliotecas incorporadas, versões e licenças. A auditoria das licenças está lá
   registrada, componente por componente, medida no binário ligado e não no que existe em disco: os
   `contrib/` do Assimp que o *build* compila e o ligador descarta aparecem um por um, com o comando
-  de conferir. O que distribuir ainda é aberto: falta o lugar onde os avisos vão aparecer.
+  de conferir. Os avisos a reproduzir têm lugar agora: seis textos como vieram, em
+  `app/src/main/assets/licenses/`, lidos do APK por um diálogo do *rail*, conferidos contra a fonte
+  byte por byte depois de extraídos do APK.

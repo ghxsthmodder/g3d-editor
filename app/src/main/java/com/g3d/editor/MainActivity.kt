@@ -208,6 +208,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             report("câmera ajustada ao conteúdo")
         }
         findViewById<View>(R.id.nativeDiagnostic).setOnClickListener { runUvDiagnostic() }
+        findViewById<View>(R.id.openLicenses).setOnClickListener { showLicenses() }
         findViewById<View>(R.id.exportObj).setOnClickListener { startModelExport(FORMAT_OBJ) }
         findViewById<View>(R.id.exportGltf).setOnClickListener { startModelExport(FORMAT_GLTF) }
         findViewById<View>(R.id.exportGlb).setOnClickListener { startModelExport(FORMAT_GLB) }
@@ -1304,6 +1305,27 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     }
 
     /**
+     * The notices a distribution has to carry, read out of the APK as they were written: the screen
+     * and the shipped file are the same bytes, so one cannot be corrected and the other forgotten.
+     */
+    private fun showLicenses() {
+        val body = StringBuilder()
+        body.append(getString(R.string.license_intro)).append("\n\n")
+        for ((label, asset) in LICENSES) {
+            body.append(getString(label)).append('\n')
+            assets.open("licenses/" + asset).bufferedReader().use { body.append(it.readText()) }
+            body.append("\n\n")
+        }
+        val view = layoutInflater.inflate(R.layout.license_text, null)
+        view.findViewById<TextView>(R.id.licenseText).text = body.toString().trimEnd()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.license_title)
+            .setView(view)
+            .setPositiveButton(R.string.license_close, null)
+            .show()
+    }
+
+    /**
      * Writes one file into the chosen folder, overwriting the one that is already there under that
      * name: the description references its companion by name, so a second copy with a suffix would
      * leave it pointing at the previous export.
@@ -1776,6 +1798,18 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         const val RECENT_PREFS = "recentes"
         const val RECENT_KEY = "lista"
         const val MAX_RECENT = 5
+
+        // Every notice the app owes, with the file that carries it, in the order the dialog shows
+        // them. One Apache text serves the icons, the Material library and the Gradle side: the 119
+        // POMs of those groups all declare it, counted in third_party/README.md.
+        val LICENSES = listOf(
+            R.string.license_assimp to "assimp.txt",
+            R.string.license_rapidjson to "rapidjson.txt",
+            R.string.license_xatlas to "xatlas.txt",
+            R.string.license_stb to "stb.txt",
+            R.string.license_glm to "glm.txt",
+            R.string.license_apache to "apache-2.0.txt"
+        )
 
         // "tela=256x256", the first line of the compositor summary.
         val CANVAS_PATTERN = Regex("tela=(\\d+)x(\\d+)")

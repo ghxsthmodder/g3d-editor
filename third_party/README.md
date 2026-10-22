@@ -147,8 +147,9 @@ lista de licenças a reproduzir precisa ser refeita sobre o `.so` — não sobre
 - Como entram: o traçado é copiado sem edição em `app/src/main/res/drawable/ic_*.xml`; o preenchimento
   preto veda em `@android:color/white` porque quem define a cor é o `iconTint` do botão. Nada de
   reamostragem, simplificação ou redesenho.
-- Tamanho adicionado: os 28 SVGs guardados somam 8,3 KB; os 28 drawables XML gerados a partir deles
-  somam 13,2 KB. No APK eles entram no bloco de recursos compilados, que não foi medido separadamente.
+- Tamanho adicionado: os 29 SVGs guardados somam 8.693 bytes; os 29 drawables XML gerados a partir
+  deles somam 13.927 bytes. No APK eles entram no bloco de recursos compilados, que não foi medido
+  separadamente.
 
 ## meshoptimizer
 
@@ -168,16 +169,43 @@ reproduzir, e onde está a obrigação:
 | `contrib/rapidjson` (cabeçalhos que usamos) | MIT + nota da Tencent | conservar aviso e texto |
 | stb `a7d4c21` | MIT *ou* Unlicense, à nossa escolha | sob Unlicense nada é exigido; sob MIT o aviso e o texto acompanham a redistribuição. As duas cópias estão no arquivo, e a escolha fica para quem publicar |
 | GLM `1.0.2` | MIT | conservar aviso e texto |
-| Material Components `1.12.0` | Apache-2.0 | aviso + texto + nota `NOTICE`, se houver |
+| Material Components `1.12.0` | Apache-2.0 (declarada no POM) | aviso + texto; **não há arquivo `NOTICE`** — conferido no `.aar`: 663 entradas e a única que não é recurso é `META-INF/com/android/build/gradle/aar-metadata.properties` |
 | Material Icons `3.0.1` | Apache-2.0 | aviso + texto; a cópia vendorizada não trouxe arquivo `NOTICE` — se um *build* futuro do upstream trouxer, ele acompanha |
+| AndroidX e Kotlin (o que o Gradle traz) | Apache-2.0 | texto único; conferido nos POMs resolvidos em cache, não por suposição: |
 | meshoptimizer | — | **não incorporado**, nenhuma obrigação |
+
+```bash
+C=~/.gradle/caches/modules-2/files-2.1
+find $C/androidx.* $C/org.jetbrains.* $C/com.google.android.material -name '*.pom' |
+  xargs grep -h -oE '<name>[^<]*[Ll]icen[^<]*</name>|<name>Apache[^<]*</name>' |
+  sed 's/.*<name>//; s/<\/name>//' | sort | uniq -c
+```
+
+Cento e dezenove POMs, três nomes diferentes para a mesma Apache-2.0 escrita de formas distintas por
+quem publicou cada um, e nenhum POM sem a tag `<licenses>`.
 
 Os seis `contrib/` compilados e descartados pelo ligador não chegam ao `.so` hoje, então o texto
 deles não é exigido na distribuição de agora — mas passa a ser no dia em que um importador que os
 usa for ligado, e a tabela de cima é o que diz isso sem repetir a medição.
 
-Como distribuir os avisos, ainda não decidido: uma tela "Sobre/Licenças" dentro do app ou um
-`app/src/main/assets/NOTICE` empacotado com os textos. Enquanto o editor só roda em desenvolvimento
-local, as cópias versionadas aqui servem de registro — nenhum APK foi publicado. A tela é o caminho
-que combina com o plano (as informações do documento já ficam visíveis no inspetor, e PLAN pede
-atribuições visíveis antes de distribuir), e ela tem de existir antes de qualquer publicação.
+**Onde os avisos ficam: já existem.** Os textos são arquivos em
+`app/src/main/assets/licenses/` — `assimp.txt`, `rapidjson.txt`, `xatlas.txt`, `stb.txt`, `glm.txt`
+e um `apache-2.0.txt` único que serve aos glifos, à biblioteca Material e a tudo que o Gradle traz —
+a tela é o botão de glifo no *rail*, que lê os textos do APK e os mostra em um diálogo rolável.
+Escolheu-se o
+*asset* em vez de texto embutido no código porque assim o que se mostra e o que se distribui são os
+mesmos bytes, conferidos um a um depois de extrair do APK (o comando está em
+[docs/BUILD.md](docs/BUILD.md)):
+
+```bash
+for par in assimp.txt:third_party/assimp/LICENSE \
+           rapidjson.txt:third_party/assimp/contrib/rapidjson/license.txt \
+           xatlas.txt:third_party/xatlas/LICENSE stb.txt:third_party/stb/LICENSE \
+           glm.txt:third_party/glm/copying.txt apache-2.0.txt:third_party/material-icons/LICENSE; do
+  cmp "app/src/main/assets/licenses/${par%%:*}" "${par#*:}" && echo "idêntico: ${par%%:*}"
+done
+```
+
+Nenhuma das seis cópias é um resumo: cada arquivo veio do `LICENSE` da própria biblioteca, e a
+escolha do stb entre as duas licenças que o arquivo dele oferece fica para quem publicar — os dois
+textos estão no asset.

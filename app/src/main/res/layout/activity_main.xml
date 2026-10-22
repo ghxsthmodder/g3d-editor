@@ -88,6 +88,15 @@
                     android:contentDescription="@string/cd_log"
                     android:tooltipText="@string/cd_log"
                     app:icon="@drawable/ic_arrow_down" />
+
+                <!-- The notices the PLAN asks for before anything is distributed are in the APK,
+                     and a file nobody can open is no notice at all: this glyph reads them. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/openLicenses"
+                    style="@style/Widget.G3D.Icon"
+                    android:contentDescription="@string/license_title"
+                    android:tooltipText="@string/license_title"
+                    app:icon="@drawable/ic_license" />
             </LinearLayout>
         </ScrollView>
 

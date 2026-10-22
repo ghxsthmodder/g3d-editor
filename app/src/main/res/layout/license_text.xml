@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp"
+    android:scrollbars="vertical">
+
+    <!-- Monospace because the texts are laid out by the people who wrote them: the box-drawing
+         banner of GLM and the column alignment of the Apache body are part of the file, and a
+         proportional font would redraw them badly. -->
+    <TextView
+        android:id="@+id/licenseText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="monospace"
+        android:paddingTop="8dp"
+        android:paddingBottom="16dp"
+        android:textColor="@color/editor_text"
+        android:textIsSelectable="true"
+        android:textSize="11sp" />
+</ScrollView>

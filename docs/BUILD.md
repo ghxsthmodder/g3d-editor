@@ -42,11 +42,12 @@ Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembl
 dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
 não é necessário.
 
-Medidas do último *build* de depuração: `app-debug.apk` de 17,0 MB, com `libg3dnative.so` despojado
-de 4,34 MB (arm64-v8a) e 4,20 MB (x86_64). É Debug com símbolos parciais, não Release: o número serve
-para acompanhar a tendência quando algo é incorporado, não como tamanho de distribuição. Os glifos
-vetoriais da interface são 27 arquivos XML que somam 13 KB de fonte; no APK eles entram no bloco de
-recursos compilados, que não é medido à parte aqui.
+Medidas do último *build* de depuração: `app-debug.apk` de 17,2 MB, com `libg3dnative.so` despojado
+de 4,43 MB (arm64-v8a) e 4,31 MB (x86_64). É Debug com símbolos parciais, não Release: o número serve
+para acompanhar a tendência quando algo é incorporado, não como tamanho de distribuição. Os exportadores
+de OBJ e glTF do Assimp, ligados nesta contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais
+da interface são 27 arquivos XML que somam 13 KB de fonte; no APK eles entram no bloco de recursos
+compilados, que não é medido à parte aqui.
 
 ## Conferir a ponte JNI
 

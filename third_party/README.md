@@ -16,7 +16,7 @@ licença e os arquivos mantidos.
 
 ## Assimp
 
-- Finalidade: importação de OBJ, glTF e GLB.
+- Finalidade: importação de OBJ, glTF e GLB e exportação dos mesmos três formatos.
 - Repositório: https://github.com/assimp/assimp
 - Versão: tag `v6.0.5`, commit `392a658f9c271be965271f45e7521a1b80ea4392`.
 - Licença: ISC (arquivo `LICENSE`), que cobre também os subcomponentes em `contrib/`.
@@ -27,13 +27,16 @@ licença e os arquivos mantidos.
   `tinyusdz` e `android-cmake` foram removidos.
 - Configuração de build (definida em `native/CMakeLists.txt`, com `FORCE`):
   - `ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=OFF`, apenas `OBJ` e `GLTF` habilitados;
-  - `ASSIMP_NO_EXPORT=ON` — a exportação será reavaliada na Fase 5;
+  - `ASSIMP_NO_EXPORT=OFF` com `ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT=OFF` e apenas `OBJ` e `GLTF`
+    habilitados na saída — o glTF cobre também o GLB, que é o mesmo documento em binário;
   - `BUILD_SHARED_LIBS=OFF` (liga estática dentro de `libg3dnative.so`);
   - `ASSIMP_BUILD_TESTS=OFF`, `ASSIMP_BUILD_ASSIMP_TOOLS=OFF`;
   - `ASSIMP_INJECT_DEBUG_POSTFIX=OFF`: sem isso o Assimp define `CMAKE_DEBUG_POSTFIX "d"` no mesmo
     build tree e a biblioteca passaria a `libg3dnatived.so`, quebrando `System.loadLibrary`.
-- Tamanho adicionado: `libg3dnative.so` (núcleo + xatlas + Assimp) fica em ~3,8 MB por ABI em
-  Debug e ~2,2 MB em Release.
+- Tamanho adicionado: os dois exportadores medidos no mesmo *build* de depuração, comparando o
+  `libg3dnative.so` despojado de dentro do APK com a configuração anterior: +97 KB em arm64-v8a e
+  +108 KB em x86_64 (4,34 → 4,43 MB e 4,20 → 4,31 MB). O Assimp continua sendo a maior parte do
+  módulo; o total do `.so` e do APK está medido em `docs/BUILD.md`.
 
 ## stb
 
@@ -50,10 +53,9 @@ licença e os arquivos mantidos.
   usa apenas as declarações dos cabeçalhos via `native/texture/g3d_image.cpp`.
 - Estado: em uso desde a Fase 4 (importação de imagens e exportação PNG do compositor).
 - Tamanho adicionado: a unidade de implementação do stb mede 263 KB como objeto de host em Release
-  (x86-64, com símbolos). No APK, onde ela é a maior parte do módulo de imagem, o `libg3dnative.so`
-  despojado inteiro mede 4,33 MB (arm64-v8a) e 4,20 MB (x86_64), dentro de um `app-debug.apk` de
-  17 MB — números de um *build* de depuração, que é o único formato que este repositório produz
-  hoje; a contribuição isolada do stb no `.so` não foi medida.
+  (x86-64, com símbolos). No APK ela é a maior parte do módulo de imagem; a contribuição isolada do
+  stb no `.so` não foi medida, e o total do `libg3dnative.so` e do `app-debug.apk` está em
+  `docs/BUILD.md`.
 
 ## GLM
 

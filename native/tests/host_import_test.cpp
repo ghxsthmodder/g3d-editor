@@ -11,6 +11,7 @@
 #include "core/document.hpp"
 #include "core/primitives.hpp"
 #include "importers/assimp_importer.hpp"
+#include "importers/import_progress.hpp"
 #include "uv/uv_service.hpp"
 
 #ifndef G3D_TEST_MODEL_DIR
@@ -310,6 +311,66 @@ int main() {
     g3d::Document &sameDocument = g3d::Document::instance();
     check(!sameDocument.importModel(nullptr, 0, "nada.obj", error) && sameDocument.meshCount() == 2,
           "importacao falha preserva a cena anterior");
+
+    // --- o que uma importacao diz de si mesma -------------------------------------------------
+    // Conferido depois da corrida, nao durante: o assimp e a caminhada pelos nos reportam do mesmo
+    // thread que importa, entao o que fica para tras e exatamente o que o painel teria perguntado,
+    // sem depender de tempo nenhum.
+    g3d::ImportProgress &report = g3d::importProgress();
+    check(!report.running(), "importacao concluida fecha o proprio progresso");
+    check(report.percent() == -1, "fora de uma corrida nao ha numero para mostrar");
+    check(report.saw(g3d::kImportPhaseRead), "a leitura dos bytes do arquivo se reportou");
+    check(report.saw(g3d::kImportPhasePost), "os passos de pos-processamento se reportaram");
+    check(report.saw(g3d::kImportPhaseAssemble), "a caminhada pelos nos do arquivo se reportou");
+    check(report.peakPercent() == 100,
+          "a corrida andou ate o fim do numero, chegou em " + std::to_string(report.peakPercent()));
+    check(report.phaseToken() == "assemble",
+          "o ultimo lugar em que a importacao estava e a montagem: " + report.phaseToken());
+
+    // Um arquivo recusado antes de qualquer leitura nao abre corrida, e nao reabre a que acabou.
+    error.clear();
+    g3d::ImportResult refused;
+    check(!g3d::importModelFromMemory(nullptr, 0, "nada.obj", refused, error) && !report.running(),
+          "arquivo vazio nao abre corrida de progresso");
+
+    // A classe sozinha, fase por fase, com os numeros que uma fonte entrega.
+    g3d::ImportProgress local;
+    check(!local.running() && local.percent() == -1 && local.phaseToken().empty(),
+          "um relatorio sem corrida nao tem o que mostrar");
+    local.begin();
+    check(local.running() && local.percent() == -1, "corrida comecada ainda nao tem numero");
+    local.updateFraction(g3d::kImportPhaseNone, 0.5f);
+    check(local.percent() == -1 && local.phaseToken().empty(),
+          "um numero que nao diz em que fase esta nao e mostrado");
+    local.update(g3d::kImportPhaseRead, 500u, 1000u);
+    check(local.percent() == 50 && local.phaseToken() == "read",
+          "metade dos bytes lidos dizem metade: " + std::to_string(local.percent()));
+    local.update(g3d::kImportPhaseRead, 1500u, 1000u);
+    check(local.percent() == 100 && local.peakPercent() == 100,
+          "um contador que passa do total e cortado em 100");
+    local.update(g3d::kImportPhasePost, 0u, 0u);
+    check(local.percent() == -1 && local.phaseToken() == "post" && local.peakPercent() == 100,
+          "fase sem contador diz qual e e nao empresta o numero da anterior");
+    local.updateFraction(g3d::kImportPhaseAssemble, 0.25f);
+    check(local.percent() == 25 && local.phaseToken() == "assemble",
+          "a fracao que a biblioteca entrega vira porcentagem da fase");
+    local.updateFraction(g3d::kImportPhaseNone, -1.0f);
+    check(local.percent() == -1 && local.phaseToken() == "assemble",
+          "sem estimativa a tela fica com a fase e sem numero");
+    local.end();
+    check(!local.running() && local.percent() == -1 && local.phaseToken() == "assemble",
+          "fechada a corrida sobra o nome da ultima fase");
+    local.begin();
+    check(!local.saw(g3d::kImportPhaseRead) && local.peakPercent() == -1,
+          "uma corrida nova esquece a que passou");
+
+    // As fases sao registradas uma por uma: o valor de uma nao pode acender a marca das outras.
+    g3d::ImportProgress solo;
+    solo.begin();
+    solo.update(g3d::kImportPhaseAssemble, 3u, 4u);
+    check(solo.saw(g3d::kImportPhaseAssemble) && !solo.saw(g3d::kImportPhaseRead) &&
+              !solo.saw(g3d::kImportPhasePost),
+          "uma fase sozinha nao marca as outras duas");
 
     std::printf("\n%d verificacoes, %d falhas\n", checks, failures);
     return failures == 0 ? 0 : 1;

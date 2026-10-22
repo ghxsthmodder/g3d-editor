@@ -1475,8 +1475,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     /**
      * The panel hands the screen to a heavy operation. The log says what started, the row over the
      * canvas says how far it got, and the button inside it is the visible way out of a run the core
-     * can actually stop. Everything else only gets the bar that moves: an interrupt that reaches
-     * nothing would be a button that lies.
+     * can actually stop. What it cannot stop still says where it is, only without a button: an
+     * interrupt that reaches nothing would be a button that lies.
      */
     private fun beginWork(message: String, stoppable: Boolean = false) {
         busy = true
@@ -1500,37 +1500,53 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         renderLog()
     }
 
-    /** One tick of the row: the generation reports through xatlas, anything else has no number. */
+    /** One tick of the row: the heavy step in progress is the one that answers. */
     private val progressTicker = object : Runnable {
         override fun run() {
             if (!busy) {
                 return
             }
-            showProgress(Native.nativeUvGenerationProgress())
+            showProgress(progressReply())
             progressHandler.postDelayed(this, PROGRESS_TICK_MS)
         }
+    }
+
+    /**
+     * Two operations report, and only one of them is under way at a time: the generation answers
+     * first because it is the one that can also be stopped, the import only while nothing runs.
+     */
+    private fun progressReply(): String {
+        val generation = Native.nativeUvGenerationProgress()
+        return if (generation.isEmpty()) Native.nativeImportProgress() else generation
     }
 
     private fun showProgress(reply: String) {
         val parts = reply.split('\t')
         val percent = parts[0].toIntOrNull() ?: -1
+        val stage = workStage(parts.getOrNull(1).orEmpty())
+        workProgress.isIndeterminate = percent < 0
         if (percent < 0) {
-            workProgress.isIndeterminate = true
-            workText.text = getString(R.string.work_running)
+            // No number is not the same as no work: a step that has nothing to count says which
+            // one it is, and the bar only moves.
+            workText.text = stage.ifEmpty { getString(R.string.work_running) }
             return
         }
-        workProgress.isIndeterminate = false
         workProgress.progress = percent.coerceAtMost(100)
-        val stage = uvStage(parts.getOrNull(1).orEmpty())
         workText.text = getString(R.string.work_percent, percent, stage)
     }
 
-    /** xatlas names its stages in English; the panel says them in the words of the editor. */
-    private fun uvStage(stage: String): String = when (stage) {
+    /**
+     * The core names its steps in its own words — xatlas in English, the importer by token — and
+     * the panel says them in the words of the editor.
+     */
+    private fun workStage(stage: String): String = when (stage) {
         "Adding mesh(es)" -> getString(R.string.work_uv_add)
         "Computing charts" -> getString(R.string.work_uv_charts)
         "Packing charts" -> getString(R.string.work_uv_pack)
         "Building output meshes" -> getString(R.string.work_uv_mesh)
+        "read" -> getString(R.string.work_import_read)
+        "post" -> getString(R.string.work_import_post)
+        "assemble" -> getString(R.string.work_import_assemble)
         else -> stage
     }
 

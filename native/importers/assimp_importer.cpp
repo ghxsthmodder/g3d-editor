@@ -9,11 +9,14 @@
 #include <utility>
 
 #include <assimp/Importer.hpp>
+#include <assimp/ProgressHandler.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#include "importers/import_progress.hpp"
 
 namespace {
 
@@ -21,6 +24,61 @@ namespace {
 // device reports as free before an import; the default is what a mid phone can hold without the
 // low memory killer showing up.
 size_t gImportBudgetBytes = 128u * 1024u * 1024u;
+
+// The report of the import under way, next to the only code that fills it.
+g3d::ImportProgress gImportProgress;
+
+// Assimp's own progress interface, which is the only way the library says anything about a run. It
+// hands over the two loops it knows about — reading the file and the post-processing steps — and
+// never looks at the answer, so this reports and promises nothing more.
+class ImportProgressHandler : public Assimp::ProgressHandler {
+public:
+    explicit ImportProgressHandler(g3d::ImportProgress *progress) : progress_(progress) {}
+
+    bool Update(float percentage) override {
+        progress_->updateFraction(static_cast<g3d::ImportPhase>(phase_), percentage);
+        return true;
+    }
+
+    void UpdateFileRead(int currentStep, int numberOfSteps) override {
+        phase_ = g3d::kImportPhaseRead;
+        report(currentStep, numberOfSteps);
+    }
+
+    void UpdatePostProcess(int currentStep, int numberOfSteps) override {
+        phase_ = g3d::kImportPhasePost;
+        report(currentStep, numberOfSteps);
+    }
+
+private:
+    void report(int currentStep, int numberOfSteps) {
+        // The library counts the read in bytes, which does not fit an int for the largest files a
+        // desktop hands over: a negative number is a phase with no estimate, not a percentage.
+        if (currentStep < 0 || numberOfSteps <= 0) {
+            progress_->update(static_cast<g3d::ImportPhase>(phase_), 0, 0);
+            return;
+        }
+        progress_->update(static_cast<g3d::ImportPhase>(phase_),
+                          static_cast<uint32_t>(currentStep), static_cast<uint32_t>(numberOfSteps));
+    }
+
+    g3d::ImportProgress *progress_;
+    int phase_ = g3d::kImportPhaseNone;
+};
+
+// A run opens and closes the report on every way out of the import, including the early ones.
+class ImportRunGuard {
+public:
+    explicit ImportRunGuard(g3d::ImportProgress *progress) : progress_(progress) {
+        progress_->begin();
+    }
+    ~ImportRunGuard() { progress_->end(); }
+    ImportRunGuard(const ImportRunGuard &) = delete;
+    ImportRunGuard &operator=(const ImportRunGuard &) = delete;
+
+private:
+    g3d::ImportProgress *progress_;
+};
 
 // One expanded vertex is carried twice: positions, normals and uvs in the document, and the
 // interleaved buffer the renderer keeps beside its own GPU copy. Indices follow the same split.
@@ -273,14 +331,32 @@ struct Expansion {
     size_t bytes = 0;                  // what the scene already costs to hold
     uint32_t merged = 0;               // references that duplicated geometry already in the scene
     uint32_t skipped = 0;              // references left out because the budget was reached
+    uint32_t visited = 0;              // nodes walked through, for the report of the run
+    uint32_t total = 0;                // nodes the file announced, or 0 when it said nothing
     std::unordered_set<Reference, ReferenceHash> seen;
 };
+
+// How many nodes the tree of the file holds. The scene publishes a mesh count but no node count, so
+// the denominator of the walk is counted by walking the pointers — a pass that touches no geometry
+// and costs nothing next to the copying it is measured against.
+uint32_t countNodes(const aiNode *node) {
+    if (node == nullptr) {
+        return 0;
+    }
+    uint32_t total = 1;
+    for (uint32_t i = 0; i < node->mNumChildren; ++i) {
+        total += countNodes(node->mChildren[i]);
+    }
+    return total;
+}
 
 void traverse(const aiNode *node, const aiMatrix4x4 &parentWorld, const aiScene *scene,
               g3d::Scene &scene3d, std::vector<std::string> &warnings, Expansion &expansion) {
     if (node == nullptr) {
         return;
     }
+    ++expansion.visited;
+    gImportProgress.update(g3d::kImportPhaseAssemble, expansion.visited, expansion.total);
     aiMatrix4x4 world = parentWorld * node->mTransformation;
     const std::string nodeName = node->mName.length > 0 ? node->mName.C_Str() : std::string();
 
@@ -342,6 +418,7 @@ bool importModelFromMemory(const void *data, size_t length, const std::string &f
         return false;
     }
 
+    const ImportRunGuard guard(&gImportProgress);
     result.scene.clear();
     result.warnings.clear();
     result.format = formatLabel(fileNameHint);
@@ -358,6 +435,10 @@ bool importModelFromMemory(const void *data, size_t length, const std::string &f
     Assimp::Importer importer;
     const aiScene *scene = nullptr;
     try {
+        // The handler is given to the importer because that is the only way assimp reports a run.
+        // It is also the library that deletes it again: SetProgressHandler takes ownership, so the
+        // pointer is owned here and nowhere else.
+        importer.SetProgressHandler(new ImportProgressHandler(&gImportProgress));
         scene = importer.ReadFileFromMemory(data, length, flags, fileNameHint.c_str());
     } catch (const std::exception &exception) {
         error = std::string("falha ao ler o arquivo: ") + exception.what();
@@ -376,6 +457,9 @@ bool importModelFromMemory(const void *data, size_t length, const std::string &f
     }
 
     Expansion expansion;
+    // The walk reports against the number of nodes the file really has, so the percentage of this
+    // phase means what it says.
+    expansion.total = countNodes(scene->mRootNode);
     traverse(scene->mRootNode, aiMatrix4x4(), scene, result.scene, result.warnings, expansion);
 
     if (expansion.merged > 0) {
@@ -436,5 +520,70 @@ size_t estimateMeshBytes(uint32_t vertices, uint32_t triangles) {
     return static_cast<size_t>(vertices) * kBytesPerVertex +
            static_cast<size_t>(triangles) * kBytesPerTriangle;
 }
+
+void ImportProgress::begin() {
+    running_.store(1, std::memory_order_relaxed);
+    percent_.store(-1, std::memory_order_relaxed);
+    phase_.store(kImportPhaseNone, std::memory_order_relaxed);
+    phases_.store(0, std::memory_order_relaxed);
+    peak_.store(-1, std::memory_order_relaxed);
+}
+
+void ImportProgress::end() { running_.store(0, std::memory_order_relaxed); }
+
+std::string ImportProgress::phaseToken() const {
+    switch (phase_.load(std::memory_order_relaxed)) {
+    case kImportPhaseRead: return "read";
+    case kImportPhasePost: return "post";
+    case kImportPhaseAssemble: return "assemble";
+    default: return {};
+    }
+}
+
+void ImportProgress::update(ImportPhase phase, uint32_t done, uint32_t total) {
+    phase_.store(phase, std::memory_order_relaxed);
+    phases_.fetch_or(1 << phase, std::memory_order_relaxed);
+    // A phase with no counter is still a phase, but it has no number: the one the phase before it
+    // reached would say more than is known.
+    if (total == 0) {
+        percent_.store(-1, std::memory_order_relaxed);
+        return;
+    }
+    // Counted in bytes for the read, which does not fit a 32-bit product for a large file.
+    const uint64_t scaled = static_cast<uint64_t>(done) * 100u / total;
+    const int percent = scaled > 100u ? 100 : static_cast<int>(scaled);
+    percent_.store(percent, std::memory_order_relaxed);
+    if (percent > peak_.load(std::memory_order_relaxed)) {
+        peak_.store(percent, std::memory_order_relaxed);
+    }
+}
+
+void ImportProgress::updateFraction(ImportPhase phase, float fraction) {
+    if (phase == kImportPhaseNone) {
+        phase = static_cast<ImportPhase>(phase_.load(std::memory_order_relaxed));
+    }
+    if (phase == kImportPhaseNone) {
+        return;
+    }
+    phase_.store(phase, std::memory_order_relaxed);
+    phases_.fetch_or(1 << phase, std::memory_order_relaxed);
+    if (fraction < 0.0f) {
+        // The library says it has no estimate: the screen is left with the phase and no number.
+        percent_.store(-1, std::memory_order_relaxed);
+        return;
+    }
+    int percent = static_cast<int>(fraction * 100.0f);
+    if (percent < 0) {
+        percent = 0;
+    } else if (percent > 100) {
+        percent = 100;
+    }
+    percent_.store(percent, std::memory_order_relaxed);
+    if (percent > peak_.load(std::memory_order_relaxed)) {
+        peak_.store(percent, std::memory_order_relaxed);
+    }
+}
+
+ImportProgress &importProgress() { return gImportProgress; }
 
 }  // namespace g3d

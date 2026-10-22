@@ -39,7 +39,11 @@ agora diz onde está: o xatlas reporta o que faz — preparar a malha, criar as 
 atlas, montar a malha — e uma barra com a porcentagem aparece na faixa sobre a beirada do canvas,
 ao lado do botão **Interromper**, porque cancelar não pode depender de um gesto escondido. Uma
 geração interrompida chega como o que foi pedida — a mensagem diz que foi interrompida, não que
-falhou — e a faixa some com o trabalho, sem gastar um dp do modelo. O comportamento do núcleo é
+falhou — e a faixa some com o trabalho, sem gastar um dp do modelo. Importar também diz em que fase
+está — lendo o arquivo, arrumando a malha, montando a cena —, cada uma com o seu número, mas não tem
+botão de interromper: o Assimp desta tag reporta e deita fora a resposta, de modo que um pedido de
+parada não teria a quem chegar, e um botão morto durante a maior parte da espera seria um botão que
+mente. O que o núcleo pode parar, ele para. O comportamento do núcleo é
 comprovado pelos nove testes do host
 (`bash native/tests/run_host_test.sh`), inclusive o renderizador headless, a ida e volta dos três
 formatos de modelo, o desfazer/refazer e a reabertura de um projeto salvo. A fase também tratou dos

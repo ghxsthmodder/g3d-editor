@@ -24,8 +24,9 @@
     <string name="viewport_hint">toque seleciona · arrasta orbita ou move a ilha · 2 dedos movem · pinça aproxima</string>
     <string name="diagnostic_uv">Diagnóstico de UV</string>
 
-    <!-- The row a long operation borrows. The stages are what xatlas names, said in the words of
-         the panel; a number the library never gave is shown as a bar that only moves. -->
+    <!-- The row a long operation borrows. The stages are the names the core reports — xatlas for
+         a UV generation, three tokens for an import — said in the words of the panel; a number the
+         library never gave is shown as a bar that only moves. -->
     <string name="work_cancel">Interromper</string>
     <string name="work_percent">%1$d%% · %2$s</string>
     <string name="work_running">trabalhando…</string>
@@ -35,6 +36,9 @@
     <string name="work_uv_charts">criar as ilhas</string>
     <string name="work_uv_pack">empacotar o atlas</string>
     <string name="work_uv_mesh">montar a malha</string>
+    <string name="work_import_read">lendo o arquivo</string>
+    <string name="work_import_post">arrumando a malha</string>
+    <string name="work_import_assemble">montando a cena</string>
 
     <string name="export_title">Exportar modelo</string>
     <string name="export_obj">OBJ</string>

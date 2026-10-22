@@ -23,6 +23,16 @@ object Native {
 
     external fun nativeImportModel(data: ByteArray, fileNameHint: String): String
 
+    /**
+     * What the import under way has to show: an empty string while nothing is running, and
+     * "<percent>\t<phase>" while it is, the phase being the loop assimp is inside of — read for the
+     * bytes of the file, post for the steps it runs over them, assemble for the walk that copies
+     * the scene into the editor's own. Polled from the panel while [nativeImportModel] works on its
+     * thread. There is no way to stop an import: the assimp in third_party reports its progress and
+     * throws the answer away, so a request to quit would land on deaf ears.
+     */
+    external fun nativeImportProgress(): String
+
     external fun nativeSceneInfo(): String
 
     /**

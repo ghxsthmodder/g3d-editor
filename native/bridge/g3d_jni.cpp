@@ -14,6 +14,7 @@
 #include "core/primitives.hpp"
 #include "exporters/model_exporter.hpp"
 #include "importers/assimp_importer.hpp"
+#include "importers/import_progress.hpp"
 #include "project/project_io.hpp"
 #include "renderer/g3d_renderer.hpp"
 #include "texture/g3d_image.hpp"
@@ -184,6 +185,17 @@ JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeImportModel(JNIEnv *e
         __android_log_print(ANDROID_LOG_INFO, kTag, "import %s: %s", hint.c_str(), report.c_str());
         return "OK\n" + report;
     }));
+}
+
+// While an import runs the panel asks what it should be showing. Empty reply for no import at all;
+// otherwise "<percent>\t<phase>", the phase being one of the tokens the interface names. Read
+// without locking: the worker thread leaves these fields alone, one at a time.
+JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeImportProgress(JNIEnv *env, jclass) {
+    g3d::ImportProgress &progress = g3d::importProgress();
+    if (!progress.running()) {
+        return toJString(env, "");
+    }
+    return toJString(env, std::to_string(progress.percent()) + "\t" + progress.phaseToken());
 }
 
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeSceneInfo(JNIEnv *env, jclass) {

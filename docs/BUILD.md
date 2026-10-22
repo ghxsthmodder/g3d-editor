@@ -42,8 +42,8 @@ Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembl
 dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
 não é necessário.
 
-Medidas do último *build* de depuração: `app-debug.apk` de 18.689.280 bytes (17,8 MiB), com
-`libg3dnative.so` despojado de 5.193.736 bytes (arm64-v8a) e 5.034.800 bytes (x86_64), os dois
+Medidas do último *build* de depuração: `app-debug.apk` de 18.694.528 bytes (17,8 MiB), com
+`libg3dnative.so` despojado de 5.199.440 bytes (arm64-v8a) e 5.040.048 bytes (x86_64), os dois
 empacotados sem compressão. O módulo de projeto traz o RapidJSON que já vinha com o
 Assimp (cabeçalhos, instanciados onde o projeto é escrito e lido), e é dele boa parte desse aumento.
 É Debug com símbolos parciais, não Release: o número serve para acompanhar a tendência quando algo é
@@ -67,7 +67,7 @@ diff <(nm -D --defined-only "$SO" | grep -o 'Java_com_g3d_editor_Native_[a-zA-Z_
       sed 's/external fun //' | sort)
 ```
 
-Sem saída, os dois lados batem. São 70 funções declaradas e 70 exportadas neste momento.
+Sem saída, os dois lados batem. São 71 funções declaradas e 71 exportadas neste momento.
 
 ## Testar o núcleo nativo sem dispositivo
 
@@ -81,7 +81,7 @@ CTest (nenhum deles faz parte do APK):
 | Teste | Executável | O que verifica |
 | --- | --- | --- |
 | `uv_smoke_test` | `host_smoke_test` | geração de UV com xatlas a partir de geometria sintética, o relatório de progresso que a biblioteca preenche enquanto roda — etapa, porcentagem, o cancelamento pedido no meio de uma geração de verdade e o que ele devolve — e o que fica de fora do relatório quando o trabalho termina |
-| `import_test` | `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento, inclusive as referências repetidas de um mesmo glTF unidas no lugar, o orçamento de memória que para a cena e diz quantas partes ficaram de fora, e os nomes com bytes fora do UTF-8 que o telefone recusaria |
+| `import_test` | `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento, inclusive as referências repetidas de um mesmo glTF unidas no lugar, o orçamento de memória que para a cena e diz quantas partes ficaram de fora, os nomes com bytes fora do UTF-8 que o telefone recusaria, e o relatório de progresso da importação — as três fases por que todo arquivo passa, o número dentro de cada uma, o que fica registrado depois que a corrida acaba e o que uma recusa antes de começar não muda |
 | `uv_islands_test` | `host_uv_test` | agrupamento de UVs em ilhas e conectividade |
 | `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, o pino que tira a ilha do alcance das ferramentas e que o reempacotamento contorna, validar, aplicar/cancelar, o desfazer/refazer, inclusive o arrasto inteiro num passo, o progresso que a sessão publicada devolve quando não há geração alguma — vazio, e um cancelar que não encontra nada — e a memória que a sessão aberta retém |
 | `export_test` | `host_export_test` | exportação OBJ/glTF/GLB em memória, ida e volta relida pelo importador: posição, UV e normal por canto, os pares `.gltf`+`.bin` e os avisos de perda |

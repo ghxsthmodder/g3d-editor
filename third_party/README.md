@@ -37,6 +37,14 @@ licença e os arquivos mantidos.
   `libg3dnative.so` despojado de dentro do APK com a configuração anterior: +97 KB em arm64-v8a e
   +108 KB em x86_64 (4,34 → 4,43 MB e 4,20 → 4,31 MB). O Assimp continua sendo a maior parte do
   módulo; o total do `.so` e do APK está medido em `docs/BUILD.md`.
+- O que a versão **não** faz: a documentação de `ProgressHandler` promete "retorne false para
+  abortar o carregamento", mas no código desta tag nenhuma chamada verifica o retorno —
+  `code/Common/Importer.cpp:703,710,836,867` e `code/AssetLib/Obj/ObjFileParser.cpp:152` ligam o
+  relatório e jogam a resposta fora, e não existe `ShouldContinue` na árvore. Uma importação,
+  portanto, só reporta: ela não pode ser interrompida. O progresso da geração de UV, que usa
+  xatlas, tem o caminho inverso — `ProgressFunc` devolve o bool e a biblioteca obedece — e é a
+  única operação com botão de interromper no app. Conferido nesta tag, não por suposição;
+  medição: um OBJ de 106 MB leva 10,4 s no host, das quais 9,7 s são dentro do Assimp.
 
 ## stb
 

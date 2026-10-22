@@ -25,6 +25,13 @@ object Native {
 
     external fun nativeSceneInfo(): String
 
+    /**
+     * Bytes held by the editor, as `source=N meshes=N layers=N edit=N`: the open file, the geometry
+     * built out of it, the compositor with its composed picture and the open UV session with its
+     * history. Numbers only, so the panel is the one that says the words.
+     */
+    external fun nativeMemoryInfo(): String
+
     external fun nativeSelectMesh(index: Int)
 
     external fun nativeRenderInit(): Boolean
@@ -123,6 +130,13 @@ object Native {
     external fun nativeTextureInfo(): String
 
     external fun nativeTextureHasCanvas(): Boolean
+
+    /**
+     * The biggest texture side this device's GPU reported, in pixels, or 0 while no GL context has
+     * been created yet. The compositor refuses a canvas above it, and the panel dims the resolutions
+     * the phone cannot sample.
+     */
+    external fun nativeTextureDeviceLimit(): Int
 
     external fun nativeTextureSetCanvas(width: Int, height: Int): String
 

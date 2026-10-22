@@ -54,6 +54,12 @@ public:
         fn(source_.data(), source_.size());
     }
 
+    // What the document holds, in bytes, counted apart because the panel names the parts: the file
+    // the model came from and the geometry built out of it. A project embeds the model, so opening
+    // one carries those bytes twice on purpose and the total says so.
+    size_t sourceBytes() const;
+    size_t meshBytes() const;
+
 private:
     Document();
 

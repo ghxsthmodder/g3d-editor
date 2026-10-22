@@ -505,7 +505,12 @@ int main() {
     check(undoneSteps == 64, "a historia guarda no maximo 64 passos, guardou " +
                                  std::to_string(undoneSteps));
     check(editor.layout(snapshot), "o layout continua legivel depois de esvaziar a historia");
+    // The line the panel shows: what the open session holds, layout and the steps behind it.
+    const size_t sessionBytes = editor.memoryBytes();
+    check(sessionBytes > 0, "a sessao aberta retem memoria: " + std::to_string(sessionBytes));
+    check(sessionBytes >= 64 * sizeof(float), "a conta cobre ao menos o layout guardado");
     editor.cancel();
+    check(editor.memoryBytes() == 0, "cancelar devolve a memoria da sessao");
     check(editor.begin(1, editorError), "reabrir depois de cancelar: " + editorError);
     check(!editor.undo(), "cancelar limpa a historia");
     editor.cancel();

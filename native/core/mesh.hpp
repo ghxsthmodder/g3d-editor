@@ -27,6 +27,10 @@ struct Mesh {
 
     // Sets error when the mesh cannot be handed to xatlas or to the renderer.
     bool validate(std::string &error) const;
+
+    // What the attribute arrays occupy: what the editor carries for this mesh, on top of
+    // the file it came from. The panel adds these up so a big model is not a surprise.
+    size_t memoryBytes() const;
 };
 
 }  // namespace g3d

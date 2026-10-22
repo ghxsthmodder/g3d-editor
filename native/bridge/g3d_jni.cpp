@@ -4,8 +4,9 @@
 #include <jni.h>
 #include <android/log.h>
 
-#include <sstream>
+#include <exception>
 #include <limits>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -95,6 +96,42 @@ g3d::ModelFormat modelFormatOf(jint format) {
     }
 }
 
+// Running out of memory is a fact about the device, not a bug in the core: a 4096 x 4096 canvas, a
+// 90 MB model or a xatlas generation all ask for more than a phone may have to give. The JVM has
+// no handler for a C++ exception crossing a native method and kills the process on one, so the
+// entry points that allocate in bulk answer through these guards instead of unwinding into Java
+// frames.
+std::string memoryFailure(const char *what, const std::exception &error) {
+    __android_log_print(ANDROID_LOG_ERROR, kTag, "%s: %s", what, error.what());
+    const std::string reason =
+        std::string(error.what()).find("bad_alloc") != std::string::npos
+            ? "faltou memoria"
+            : error.what();
+    return "ERROR: nao foi possivel " + std::string(what) + ": " + reason;
+}
+
+template <typename Fn>
+std::string guardText(const char *what, Fn fn) {
+    try {
+        return fn();
+    } catch (const std::exception &error) {
+        return memoryFailure(what, error);
+    }
+}
+
+// For the replies that are an array: null is all Kotlin gets, which is how it already reads a
+// failure of these functions, and the reason lands in logcat beside the ones reported by hand.
+template <typename Fn>
+bool guardCall(const char *what, Fn fn) {
+    try {
+        fn();
+        return true;
+    } catch (const std::exception &error) {
+        __android_log_print(ANDROID_LOG_ERROR, kTag, "%s: %s", what, error.what());
+        return false;
+    }
+}
+
 }  // namespace
 
 extern "C" {
@@ -111,45 +148,61 @@ JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeBuildInfo(JNIEnv *env
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeImportModel(JNIEnv *env, jclass,
                                                                        jbyteArray data,
                                                                        jstring fileNameHint) {
-    if (data == nullptr) {
-        return toJString(env, "ERROR: arquivo vazio");
-    }
-    std::string hint;
-    if (fileNameHint != nullptr) {
-        const char *chars = env->GetStringUTFChars(fileNameHint, nullptr);
-        if (chars != nullptr) {
-            hint = chars;
-            env->ReleaseStringUTFChars(fileNameHint, chars);
+    return toJString(env, guardText("importar o modelo", [&] {
+        if (data == nullptr) {
+            return std::string("ERROR: arquivo vazio");
         }
-    }
+        std::string hint;
+        if (fileNameHint != nullptr) {
+            const char *chars = env->GetStringUTFChars(fileNameHint, nullptr);
+            if (chars != nullptr) {
+                hint = chars;
+                env->ReleaseStringUTFChars(fileNameHint, chars);
+            }
+        }
 
-    const jsize length = env->GetArrayLength(data);
-    // Copied out of the JVM before importing: the JNI array accessors must not be held across the
-    // multi-second work an assimp import can take.
-    std::vector<jbyte> buffer(static_cast<size_t>(length > 0 ? length : 0));
-    if (!buffer.empty()) {
-        env->GetByteArrayRegion(data, 0, length, buffer.data());
-    }
+        const jsize length = env->GetArrayLength(data);
+        // Copied out of the JVM before importing: the JNI array accessors must not be held
+        // across the multi-second work an assimp import can take.
+        std::vector<jbyte> buffer(static_cast<size_t>(length > 0 ? length : 0));
+        if (!buffer.empty()) {
+            env->GetByteArrayRegion(data, 0, length, buffer.data());
+        }
 
-    std::string error;
-    const bool imported =
-        g3d::Document::instance().importModel(buffer.data(), static_cast<size_t>(length), hint,
-                                              error);
+        std::string error;
+        const bool imported =
+            g3d::Document::instance().importModel(buffer.data(), static_cast<size_t>(length), hint,
+                                                  error);
 
-    if (!imported) {
-        __android_log_print(ANDROID_LOG_ERROR, kTag, "import %s failed: %s", hint.c_str(),
-                            error.c_str());
-        return toJString(env, "ERROR: " + error);
-    }
-    const std::string report = g3d::Document::instance().lastImportReport();
-    __android_log_print(ANDROID_LOG_INFO, kTag, "import %s: %s", hint.c_str(), report.c_str());
-    return toJString(env, "OK\n" + report);
+        if (!imported) {
+            __android_log_print(ANDROID_LOG_ERROR, kTag, "import %s failed: %s", hint.c_str(),
+                                error.c_str());
+            return "ERROR: " + error;
+        }
+        const std::string report = g3d::Document::instance().lastImportReport();
+        __android_log_print(ANDROID_LOG_INFO, kTag, "import %s: %s", hint.c_str(), report.c_str());
+        return "OK\n" + report;
+    }));
 }
 
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeSceneInfo(JNIEnv *env, jclass) {
     g3d::Document &document = g3d::Document::instance();
     std::ostringstream stream;
     stream << document.describe() << "\n" << document.hierarchy();
+    return toJString(env, stream.str());
+}
+
+/**
+ * What the editor holds, in bytes, counted by part: the file the model came in with, the geometry
+ * built out of it, the compositor with its composed picture, and the open UV session with its
+ * history. Numbers rather than a sentence, because the panel decides the words.
+ */
+JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeMemoryInfo(JNIEnv *env, jclass) {
+    std::ostringstream stream;
+    stream << "source=" << g3d::Document::instance().sourceBytes()
+           << " meshes=" << g3d::Document::instance().meshBytes()
+           << " layers=" << g3d::TextureStudio::instance().memoryBytes()
+           << " edit=" << g3d::UvEditor::instance().memoryBytes();
     return toJString(env, stream.str());
 }
 
@@ -161,10 +214,13 @@ JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeSelectMesh(JNIEnv *, jcl
 // All of these must run on the GL thread; the Kotlin view queues them through queueEvent().
 
 JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeRenderInit(JNIEnv *, jclass) {
-    const bool ready = g3d::Renderer::instance().onContextCreated();
-    if (!ready) {
-        __android_log_print(ANDROID_LOG_ERROR, kTag, "GL context setup failed");
-    }
+    bool ready = false;
+    guardCall("criar o contexto GL", [&] {
+        ready = g3d::Renderer::instance().onContextCreated();
+        if (!ready) {
+            __android_log_print(ANDROID_LOG_ERROR, kTag, "GL context setup failed");
+        }
+    });
     return ready ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -174,11 +230,13 @@ JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeRenderResize(JNIEnv *, j
 }
 
 JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeRenderUpload(JNIEnv *, jclass) {
-    g3d::Renderer::instance().uploadScene();
+    // The two GL entry points that allocate: a frame that cannot get its geometry or its composed
+    // picture is a frame that does not show it, not a reason to stop the process.
+    guardCall("enviar a geometria", [&] { g3d::Renderer::instance().uploadScene(); });
 }
 
 JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeRenderDraw(JNIEnv *, jclass) {
-    g3d::Renderer::instance().draw();
+    guardCall("desenhar o quadro", [&] { g3d::Renderer::instance().draw(); });
 }
 
 JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeRenderOrbit(JNIEnv *, jclass, jfloat dx,
@@ -258,34 +316,40 @@ JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeUvSmokeTest(JNIEnv *e
 
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeUvBegin(JNIEnv *env, jclass,
                                                                    jint index) {
-    std::string error;
-    if (!g3d::UvEditor::instance().begin(index < 0 ? 0u : static_cast<uint32_t>(index), error)) {
-        return toJString(env, "ERROR: " + error);
-    }
-    g3d::UvEditor &editor = g3d::UvEditor::instance();
-    std::ostringstream stream;
-    stream << "OK\n" << editor.describe() << "\n" << editor.report();
-    return toJString(env, stream.str());
+    // Opening a session copies the whole mesh, so both of these allocation-heavy calls are guarded.
+    return toJString(env, guardText("abrir a edicao de UV", [&] {
+        std::string error;
+        if (!g3d::UvEditor::instance().begin(index < 0 ? 0u : static_cast<uint32_t>(index),
+                                             error)) {
+            return "ERROR: " + error;
+        }
+        g3d::UvEditor &editor = g3d::UvEditor::instance();
+        std::ostringstream stream;
+        stream << "OK\n" << editor.describe() << "\n" << editor.report();
+        return stream.str();
+    }));
 }
 
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeUvGenerate(JNIEnv *env, jclass,
                                                                       jint index, jint padding,
                                                                       jint resolution) {
-    g3d::UvOptions options;
-    options.padding = padding > 0 ? static_cast<uint32_t>(padding) : 2u;
-    options.resolution = resolution > 0 ? static_cast<uint32_t>(resolution) : 0u;
+    return toJString(env, guardText("gerar os UVs", [&] {
+        g3d::UvOptions options;
+        options.padding = padding > 0 ? static_cast<uint32_t>(padding) : 2u;
+        options.resolution = resolution > 0 ? static_cast<uint32_t>(resolution) : 0u;
 
-    std::string error;
-    if (!g3d::UvEditor::instance().generate(
-            index < 0 ? 0u : static_cast<uint32_t>(index), options, error)) {
-        return toJString(env, "ERROR: " + error);
-    }
-    g3d::UvEditor &editor = g3d::UvEditor::instance();
-    std::ostringstream stream;
-    stream << "OK\n" << editor.describe() << "\n" << editor.report();
-    __android_log_print(ANDROID_LOG_INFO, kTag, "uv generate mesh=%d: %s", index,
-                        editor.describe().c_str());
-    return toJString(env, stream.str());
+        std::string error;
+        if (!g3d::UvEditor::instance().generate(
+                index < 0 ? 0u : static_cast<uint32_t>(index), options, error)) {
+            return "ERROR: " + error;
+        }
+        g3d::UvEditor &editor = g3d::UvEditor::instance();
+        std::ostringstream stream;
+        stream << "OK\n" << editor.describe() << "\n" << editor.report();
+        __android_log_print(ANDROID_LOG_INFO, kTag, "uv generate mesh=%d: %s", index,
+                            editor.describe().c_str());
+        return stream.str();
+    }));
 }
 
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeUvApply(JNIEnv *env, jclass) {
@@ -358,9 +422,14 @@ JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvFit(JNIEnv *, jcla
 
 JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvRepack(JNIEnv *, jclass,
                                                                      jint padding) {
-    return g3d::UvEditor::instance().repack(padding > 0 ? static_cast<uint32_t>(padding) : 1u)
-               ? JNI_TRUE
-               : JNI_FALSE;
+    // Repacking asks xatlas for a layout of every island, which is the second biggest allocation
+    // the editor makes after a generation.
+    bool packed = false;
+    guardCall("reempacotar as ilhas", [&] {
+        const uint32_t pad = padding > 0 ? static_cast<uint32_t>(padding) : 1u;
+        packed = g3d::UvEditor::instance().repack(pad);
+    });
+    return packed ? JNI_TRUE : JNI_FALSE;
 }
 
 // --- undo and redo ---------------------------------------------------------------------
@@ -457,39 +526,41 @@ JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeSetUvOverlay(JNIEnv *, j
 // The stack guards itself, so these run on any thread. Only importing and exporting do enough
 // work to be worth a background thread; the UI refreshes the list from nativeTextureInfo().
 
-JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeTextureImportImage(JNIEnv *env, jclass,
-                                                                              jbyteArray data,
-                                                                              jstring fileNameHint) {
-    if (data == nullptr || env->GetArrayLength(data) == 0) {
-        return toJString(env, "ERROR: arquivo vazio");
-    }
-    std::string hint;
-    if (fileNameHint != nullptr) {
-        const char *chars = env->GetStringUTFChars(fileNameHint, nullptr);
-        if (chars != nullptr) {
-            hint = chars;
-            env->ReleaseStringUTFChars(fileNameHint, chars);
+JNIEXPORT jstring JNICALL
+Java_com_g3d_editor_Native_nativeTextureImportImage(JNIEnv *env, jclass, jbyteArray data,
+                                                   jstring fileNameHint) {
+    return toJString(env, guardText("importar a imagem", [&] {
+        if (data == nullptr || env->GetArrayLength(data) == 0) {
+            return std::string("ERROR: arquivo vazio");
         }
-    }
-    const jsize length = env->GetArrayLength(data);
-    std::vector<jbyte> buffer(static_cast<size_t>(length));
-    env->GetByteArrayRegion(data, 0, length, buffer.data());
+        std::string hint;
+        if (fileNameHint != nullptr) {
+            const char *chars = env->GetStringUTFChars(fileNameHint, nullptr);
+            if (chars != nullptr) {
+                hint = chars;
+                env->ReleaseStringUTFChars(fileNameHint, chars);
+            }
+        }
+        const jsize length = env->GetArrayLength(data);
+        std::vector<jbyte> buffer(static_cast<size_t>(length));
+        env->GetByteArrayRegion(data, 0, length, buffer.data());
 
-    // Decoding and composing are CPU work on a buffer the JVM owns; the copy above releases the
-    // array before any of it happens.
-    g3d::Image image;
-    std::string error;
-    if (!g3d::decodeImage(buffer.data(), static_cast<size_t>(length), hint, image, error)) {
-        return toJString(env, "ERROR: " + error);
-    }
-    const int id = g3d::TextureStudio::instance().addLayer(image, error);
-    if (id <= 0) {
-        return toJString(env, "ERROR: " + error);
-    }
-    std::ostringstream stream;
-    stream << "OK\ncamada=" << id << "\n" << g3d::TextureStudio::instance().describe();
-    __android_log_print(ANDROID_LOG_INFO, kTag, "texture layer %d from %s", id, hint.c_str());
-    return toJString(env, stream.str());
+        // Decoding and composing are CPU work on a buffer the JVM owns; the copy above releases the
+        // array before any of it happens.
+        g3d::Image image;
+        std::string error;
+        if (!g3d::decodeImage(buffer.data(), static_cast<size_t>(length), hint, image, error)) {
+            return "ERROR: " + error;
+        }
+        const int id = g3d::TextureStudio::instance().addLayer(image, error);
+        if (id <= 0) {
+            return "ERROR: " + error;
+        }
+        std::ostringstream stream;
+        stream << "OK\ncamada=" << id << "\n" << g3d::TextureStudio::instance().describe();
+        __android_log_print(ANDROID_LOG_INFO, kTag, "texture layer %d from %s", id, hint.c_str());
+        return stream.str();
+    }));
 }
 
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeTextureInfo(JNIEnv *env, jclass) {
@@ -502,6 +573,11 @@ JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeTextureInfo(JNIEnv *e
 JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureHasCanvas(JNIEnv *, jclass) {
     g3d::TextureStudio &studio = g3d::TextureStudio::instance();
     return studio.canvasWidth() > 0 && studio.canvasHeight() > 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+// 0 until the GL thread has a context to ask; the interface dims the resolutions above it.
+JNIEXPORT jint JNICALL Java_com_g3d_editor_Native_nativeTextureDeviceLimit(JNIEnv *, jclass) {
+    return static_cast<jint>(g3d::TextureStudio::instance().deviceLimit());
 }
 
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeTextureSetCanvas(JNIEnv *env, jclass,
@@ -588,21 +664,22 @@ JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeTextureScale(JNIEnv 
 JNIEXPORT jbyteArray JNICALL Java_com_g3d_editor_Native_nativeTexturePng(JNIEnv *env, jclass) {
     std::string error;
     g3d::Image picture;
-    if (!g3d::TextureStudio::instance().render(picture, error)) {
-        __android_log_print(ANDROID_LOG_ERROR, kTag, "texture render: %s", error.c_str());
-        return nullptr;
-    }
     std::vector<uint8_t> png;
-    if (!g3d::encodePng(picture, png, error)) {
-        __android_log_print(ANDROID_LOG_ERROR, kTag, "texture encode: %s", error.c_str());
-        return nullptr;
-    }
-    jbyteArray out = env->NewByteArray(static_cast<jsize>(png.size()));
-    if (out != nullptr) {
-        env->SetByteArrayRegion(out, 0, static_cast<jsize>(png.size()),
-                                reinterpret_cast<const jbyte *>(png.data()));
-    }
-    return out;
+    jbyteArray out = nullptr;
+    // Composing paints a canvas-sized picture and encoding keeps its bytes: both ask the allocator
+    // for the biggest single buffer the compositor has.
+    const bool composed = guardCall("compor a textura", [&] {
+        if (!g3d::TextureStudio::instance().render(picture, error)) {
+            __android_log_print(ANDROID_LOG_ERROR, kTag, "texture render: %s", error.c_str());
+            return;
+        }
+        if (!g3d::encodePng(picture, png, error)) {
+            __android_log_print(ANDROID_LOG_ERROR, kTag, "texture encode: %s", error.c_str());
+            return;
+        }
+        out = toByteArray(env, png);
+    });
+    return composed ? out : nullptr;
 }
 
 // --- model export ----------------------------------------------------------------------
@@ -628,10 +705,14 @@ Java_com_g3d_editor_Native_nativeExportModel(JNIEnv *env, jclass, jstring baseNa
     g3d::ModelExport output;
     std::string error;
     bool exported = false;
-    g3d::Document::instance().withScene([&](g3d::Scene &scene) {
-        exported = g3d::exportModel(scene, modelFormatOf(format), name, output, error);
+    // An export holds every file of the format in memory before the picker writes them out, so a
+    // big scene can be the thing that does not fit.
+    const bool guarded = guardCall("exportar o modelo", [&] {
+        g3d::Document::instance().withScene([&](g3d::Scene &scene) {
+            exported = g3d::exportModel(scene, modelFormatOf(format), name, output, error);
+        });
     });
-    if (!exported) {
+    if (!guarded || !exported) {
         __android_log_print(ANDROID_LOG_ERROR, kTag, "export: %s", error.c_str());
         return nullptr;
     }
@@ -675,11 +756,17 @@ JNIEXPORT jbyteArray JNICALL Java_com_g3d_editor_Native_nativeProjectBytes(JNIEn
     std::vector<uint8_t> file;
     g3d::ProjectReport report;
     std::string error;
-    if (!g3d::saveProject(file, report, error)) {
-        __android_log_print(ANDROID_LOG_ERROR, kTag, "save project: %s", error.c_str());
-        return nullptr;
-    }
-    return toByteArray(env, file);
+    jbyteArray out = nullptr;
+    // A project carries the model file and every layer picture inside one buffer, so it is the
+    // largest allocation the editor makes.
+    const bool saved = guardCall("gravar o projeto", [&] {
+        if (!g3d::saveProject(file, report, error)) {
+            __android_log_print(ANDROID_LOG_ERROR, kTag, "save project: %s", error.c_str());
+            return;
+        }
+        out = toByteArray(env, file);
+    });
+    return saved ? out : nullptr;
 }
 
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeProjectReport(JNIEnv *env, jclass) {
@@ -689,26 +776,29 @@ JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeProjectReport(JNIEnv 
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeOpenProject(JNIEnv *env, jclass,
                                                                         jbyteArray data,
                                                                         jstring fileName) {
-    if (data == nullptr) {
-        return toJString(env, "ERROR: arquivo vazio");
-    }
-    const std::string name = readString(env, fileName);
-    const jsize length = env->GetArrayLength(data);
-    std::vector<jbyte> buffer(static_cast<size_t>(length > 0 ? length : 0));
-    if (!buffer.empty()) {
-        env->GetByteArrayRegion(data, 0, length, buffer.data());
-    }
+    return toJString(env, guardText("abrir o projeto", [&] {
+        if (data == nullptr) {
+            return std::string("ERROR: arquivo vazio");
+        }
+        const std::string name = readString(env, fileName);
+        const jsize length = env->GetArrayLength(data);
+        std::vector<jbyte> buffer(static_cast<size_t>(length > 0 ? length : 0));
+        if (!buffer.empty()) {
+            env->GetByteArrayRegion(data, 0, length, buffer.data());
+        }
 
-    g3d::ProjectReport report;
-    std::string error;
-    const bool opened = g3d::openProject(buffer.data(), static_cast<size_t>(length), name, report,
-                                         error);
-    const std::string text = g3d::projectReport();
-    __android_log_print(ANDROID_LOG_INFO, kTag, "open project %s: %s", name.c_str(), text.c_str());
-    if (!opened) {
-        return toJString(env, "ERROR: " + error);
-    }
-    return toJString(env, "OK\n" + text);
+        g3d::ProjectReport report;
+        std::string error;
+        const bool opened = g3d::openProject(buffer.data(), static_cast<size_t>(length), name,
+                                             report, error);
+        const std::string text = g3d::projectReport();
+        __android_log_print(ANDROID_LOG_INFO, kTag, "open project %s: %s", name.c_str(),
+                            text.c_str());
+        if (!opened) {
+            return "ERROR: " + error;
+        }
+        return "OK\n" + text;
+    }));
 }
 
 }  // extern "C"

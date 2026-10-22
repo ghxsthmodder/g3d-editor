@@ -22,6 +22,8 @@ public:
 
     uint32_t totalVertices() const;
     uint32_t totalTriangles() const;
+    // Bytes the meshes hold between them, for the panel's memory line.
+    size_t memoryBytes() const;
 
     // -1 means nothing selected. Indices outside the scene select nothing.
     int selected() const;

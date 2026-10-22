@@ -81,6 +81,9 @@ public:
     size_t undoSteps() const { return undo_.size(); }
     size_t redoSteps() const { return redo_.size(); }
     std::string historyDescribe() const;
+    // The layout, the grouping and every recorded step: what an open session keeps on the phone,
+    // which is why the history window is trimmed.
+    size_t memoryBytes() const;
 
     // The atlas the layout targets, in texels. Padding is expressed in texels, so the session
     // needs the size to turn it into UV units.

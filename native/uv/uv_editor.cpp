@@ -207,6 +207,11 @@ std::string UvEditor::history() {
     return session_.historyDescribe();
 }
 
+size_t UvEditor::memoryBytes() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return active_ ? session_.memoryBytes() : 0u;
+}
+
 bool UvEditor::isSelected(uint32_t island) {
     std::lock_guard<std::mutex> guard(mutex_);
     if (!active_) {

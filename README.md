@@ -18,9 +18,13 @@ de glifos Material vendorizados no lugar das duas barras de texto, inspetor com 
 Camadas, atlas dominante quando a edição é dele (3D fica com ~22% da tela) e arrastar com um dedo
 move as ilhas selecionadas. O comportamento do núcleo é comprovado pelos nove testes do host
 (`bash native/tests/run_host_test.sh`), inclusive o renderizador headless, a ida e volta dos três
-formatos de modelo, o desfazer/refazer e a reabertura de um projeto salvo. O layout novo, o
-salvamento e a leitura via SAF ainda não foram validados em telefone, e o desfazer hoje cobre a
-sessão de UV aberta, não o documento inteiro.
+formatos de modelo, o desfazer/refazer e a reabertura de um projeto salvo. A fase também tratou dos
+limites: a **tela do compositor não passa do `GL_MAX_TEXTURE_SIZE`** que o driver informou (as
+resoluções acima ficam apagadas no painel), a **memória retida** aparece na aba Cena somada por
+origem — arquivo, malhas, camadas com a imagem composta e a sessão de UV — e as chamadas caras do JNI
+respondem com erro em vez de deixar uma `std::bad_alloc` atravessar para a pilha do Java. O layout
+novo, o salvamento e a leitura via SAF ainda não foram validados em telefone, e o desfazer hoje cobre
+a sessão de UV aberta, não o documento inteiro.
 
 ## Compilar
 

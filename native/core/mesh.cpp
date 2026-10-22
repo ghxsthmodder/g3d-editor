@@ -18,6 +18,13 @@ void Mesh::clear() {
     indices.clear();
 }
 
+size_t Mesh::memoryBytes() const {
+    // The capacity is what the allocator holds, which is the number that matters on a phone: a mesh
+    // that once had more vertices keeps the buffer it grew to.
+    return positions.capacity() * sizeof(float) + normals.capacity() * sizeof(float) +
+           uvs.capacity() * sizeof(float) + indices.capacity() * sizeof(uint32_t);
+}
+
 bool Mesh::validate(std::string &error) const {
     if (positions.empty() || positions.size() % 3 != 0) {
         error = "positions must be a non-empty multiple of 3";

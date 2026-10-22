@@ -96,3 +96,8 @@ licença MIT, já presente no repositório — nada novo foi baixado para isto.
   anterior.
 - A versão é rígida: um arquivo de versão maior que `1` é recusado com o número na mensagem, em vez
   de ser lido por cima do que não se entende.
+- A tela do compositor é checada contra o `GL_MAX_TEXTURE_SIZE` do telefone onde o projeto abre, que
+  é publicado no `native/renderer/g3d_renderer.cpp` assim que o contexto GL existe. Um projeto
+  gravado com atlas de 4096 aberto num telefone que só segura 2048 abre do mesmo jeito, com um aviso
+  dizendo que a tela salva não coube e qual é o limite do aparelho, e fica sem tela até o usuário
+  escolher uma resolução que caiba. O arquivo não é reescrito por causa disto.

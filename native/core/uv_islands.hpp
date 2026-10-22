@@ -29,6 +29,9 @@ struct UvIslands {
     // Faces of one island, as the half-open range [firstFace, firstFace + faceCount) of faceOrder.
     const UvIsland *island(uint32_t index) const;
     std::string describe() const;
+
+    // What the grouping costs the editor, for the panel's memory line.
+    size_t memoryBytes() const;
 };
 
 // Groups the faces of a mesh that touch in UV space. Two faces share an island when they use the

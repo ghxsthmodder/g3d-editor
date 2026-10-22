@@ -42,13 +42,14 @@ Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembl
 dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
 não é necessário.
 
-Medidas do último *build* de depuração: `app-debug.apk` de 17,6 MB, com `libg3dnative.so` despojado
-de 5,10 MB (arm64-v8a) e 4,95 MB (x86_64). O módulo de projeto traz o RapidJSON que já vinha com o
-Assimp (cabeçalhos, instanciados onde o projeto é escrito e lido), e é dele boa parte desse aumento. É Debug com símbolos parciais, não Release: o número serve
-para acompanhar a tendência quando algo é incorporado, não como tamanho de distribuição. Os exportadores
-de OBJ e glTF do Assimp, ligados nesta contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais
-da interface são 29 arquivos XML que somam 13,9 KB de fonte; no APK eles entram no bloco de recursos
-compilados, que não é medido à parte aqui.
+Medidas do último *build* de depuração: `app-debug.apk` de 17,7 MB, com `libg3dnative.so` despojado
+de 5,11 MB (arm64-v8a) e 4,96 MB (x86_64). O módulo de projeto traz o RapidJSON que já vinha com o
+Assimp (cabeçalhos, instanciados onde o projeto é escrito e lido), e é dele boa parte desse aumento.
+É Debug com símbolos parciais, não Release: o número serve para acompanhar a tendência quando algo é
+incorporado, não como tamanho de distribuição. Os exportadores de OBJ e glTF do Assimp, ligados nesta
+contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais da interface são 29 arquivos XML que
+somam 13,9 KB de fonte; no APK eles entram no bloco de recursos compilados, que não é medido à parte
+aqui.
 
 ## Conferir a ponte JNI
 
@@ -65,7 +66,7 @@ diff <(nm -D --defined-only "$SO" | grep -o 'Java_com_g3d_editor_Native_[a-zA-Z_
       sed 's/external fun //' | sort)
 ```
 
-Sem saída, os dois lados batem. São 61 funções declaradas e 61 exportadas neste momento.
+Sem saída, os dois lados batem. São 63 funções declaradas e 63 exportadas neste momento.
 
 ## Testar o núcleo nativo sem dispositivo
 
@@ -81,12 +82,12 @@ CTest (nenhum deles faz parte do APK):
 | `uv_smoke_test` | `host_smoke_test` | geração de UV com xatlas a partir de geometria sintética |
 | `import_test` | `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento |
 | `uv_islands_test` | `host_uv_test` | agrupamento de UVs em ilhas e conectividade |
-| `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, validar, aplicar/cancelar e o desfazer/refazer, inclusive o arrasto inteiro num passo |
+| `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, validar, aplicar/cancelar, o desfazer/refazer, inclusive o arrasto inteiro num passo, e a memória que a sessão aberta retém |
 | `export_test` | `host_export_test` | exportação OBJ/glTF/GLB em memória, ida e volta relida pelo importador: posição, UV e normal por canto, os pares `.gltf`+`.bin` e os avisos de perda |
-| `compose_test` | `host_compose_test` | pilha de camadas: fundo, mover, girar, escalar, opacidade, visibilidade, ordem, duplicar, remover, orçamento de memória e o PNG resultante |
+| `compose_test` | `host_compose_test` | pilha de camadas: fundo, mover, girar, escalar, opacidade, visibilidade, ordem, duplicar, remover, as duas recusas de tela (limite da GPU e orçamento de megapixels), a conta de memória retida com a imagem composta e o PNG resultante |
 | `project_test` | `host_project_test` | container `.g3dp`: escrita e leitura, cabeçalho cortado, mágica errada, versão futura, bloco desalinhado, arquivo truncado, e a ida e volta do editor inteiro — UVs aplicados byte a byte, tela, fundo, ordem, posição, giro, escala, opacidade e visibilidade das camadas |
 | `image_test` | `host_image_test` | decodificação PNG/JPEG (stb), ida e volta sem perdas do PNG, paleta com transparência, limite de pixels e quadriculado de referência |
-| `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer: vista 3D, vista 2D do atlas e a textura composta aplicada nos dois modos |
+| `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer: vista 3D, vista 2D do atlas, a textura composta aplicada nos dois modos e o `GL_MAX_TEXTURE_SIZE` do driver publicado como limite de tela do compositor |
 
 `render_test` só é construído quando o host tem EGL + OpenGL ES 3 (`libegl-dev`,
 `libgles-dev`/Mesa). Ele usa a plataforma *surfaceless* do Mesa e, quando não há contexto

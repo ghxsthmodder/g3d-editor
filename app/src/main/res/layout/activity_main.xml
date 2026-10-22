@@ -315,6 +315,16 @@
                     android:textColor="@color/editor_text_dim"
                     android:textSize="11sp" />
 
+                <!-- One line for what the phone is holding. The compositor's own number covers only
+                     its layers, and the two together are what makes a device run out. -->
+                <TextView
+                    android:id="@+id/memorySummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="4dp"
+                    android:textColor="@color/editor_text_dim"
+                    android:textSize="11sp" />
+
                 <LinearLayout
                     android:id="@+id/hierarchyList"
                     android:layout_width="match_parent"

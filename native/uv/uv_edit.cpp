@@ -545,6 +545,19 @@ std::string UvSession::historyDescribe() const {
            " historico=" + std::to_string(bytes / 1024) + "KB";
 }
 
+size_t UvSession::memoryBytes() const {
+    size_t bytes = working_.memoryBytes() + islands_.memoryBytes() +
+                   loadedUvs_.capacity() * sizeof(float) +
+                   selected_.capacity() * sizeof(uint32_t);
+    for (const Step &step : undo_) {
+        bytes += stepBytes(step);
+    }
+    for (const Step &step : redo_) {
+        bytes += stepBytes(step);
+    }
+    return bytes;
+}
+
 UvEditReport UvSession::validate() const {
     UvEditReport report;
     if (!isLoaded()) {

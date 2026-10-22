@@ -167,4 +167,8 @@
     <string name="status_no_selection">nenhuma malha selecionada</string>
     <string name="hierarchy_none">nenhuma malha no documento</string>
     <string name="uv_report_title">geração de UV do cubo de teste:</string>
+
+    <!-- Os números vêm do núcleo em bytes; estas palavras são o que o painel mostra. -->
+    <string name="memory_line">memória retida: %1$s MB (arquivo %2$s · malhas %3$s · camadas %4$s · edição %5$s)</string>
+    <string name="memory_empty">memória retida: 0 MB</string>
 </resources>

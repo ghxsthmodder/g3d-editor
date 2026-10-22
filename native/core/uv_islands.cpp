@@ -75,6 +75,11 @@ std::string UvIslands::describe() const {
     return "ilhas=" + std::to_string(count()) + " area_uv=" + std::to_string(total);
 }
 
+size_t UvIslands::memoryBytes() const {
+    return faceIsland.capacity() * sizeof(uint32_t) + faceOrder.capacity() * sizeof(uint32_t) +
+           islands.capacity() * sizeof(UvIsland);
+}
+
 bool computeIslands(const Mesh &mesh, UvIslands &out, std::string &error) {
     out.clear();
     const uint32_t faceCount = mesh.triangleCount();

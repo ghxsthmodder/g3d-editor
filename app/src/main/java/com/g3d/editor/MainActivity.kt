@@ -57,6 +57,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var hierarchyPanel: View
     private lateinit var hierarchyList: LinearLayout
     private lateinit var sceneSummary: TextView
+    private lateinit var memorySummary: TextView
     private lateinit var outputScroll: ScrollView
     private lateinit var outputText: TextView
     private lateinit var statusLine: TextView
@@ -82,6 +83,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
     private val textureRows = mutableListOf<Pair<Int, View>>()
     private val textureStats = mutableMapOf<Int, String>()
+    private val sizePresetRows = mutableListOf<LinearLayout>()
 
     private val openModel =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -138,6 +140,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         hierarchyPanel = findViewById(R.id.hierarchyPanel)
         hierarchyList = findViewById(R.id.hierarchyList)
         sceneSummary = findViewById(R.id.sceneSummary)
+        memorySummary = findViewById(R.id.memorySummary)
         outputScroll = findViewById(R.id.outputScroll)
         outputText = findViewById(R.id.output)
         statusLine = findViewById(R.id.statusLine)
@@ -380,6 +383,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         uvPanel.visibility = if (tab == InspectorTab.Uv) View.VISIBLE else View.GONE
         texturePanel.visibility = if (tab == InspectorTab.Layers) View.VISIBLE else View.GONE
         viewport.setSplitRatio(if (tab == InspectorTab.Scene) SPLIT_MODEL else SPLIT_ATLAS)
+        applyDeviceLimit()
+        refreshMemoryLine()
         if (tab == InspectorTab.Layers) {
             showAtlasForTextures()
             refreshTextureStack()
@@ -400,6 +405,25 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         for (i in 0 until row.childCount) {
             val preset = row.getChildAt(i) as MaterialButton
             preset.setOnClickListener { field.setText(preset.text) }
+        }
+        sizePresetRows += row
+    }
+
+    /**
+     * Dims the resolutions this phone's GPU cannot sample. The limit is what the driver answered when
+     * the GL context was created: before that, or where the driver would not say, nothing is dimmed,
+     * because refusing a size the device may well support would be the worse mistake.
+     */
+    private fun applyDeviceLimit() {
+        if (!Native.isAvailable) return
+        val limit = Native.nativeTextureDeviceLimit()
+        if (limit <= 0) return
+        for (row in sizePresetRows) {
+            for (i in 0 until row.childCount) {
+                val preset = row.getChildAt(i) as MaterialButton
+                val side = preset.text.toString().toIntOrNull() ?: continue
+                preset.isEnabled = side <= limit
+            }
         }
     }
 
@@ -571,10 +595,15 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     }
 
     private fun refreshUvStatus() {
-        if (!uvOpen || !Native.isAvailable) return
-        uvStatusText.text = Native.nativeUvStatus().lineSequence()
-            .filter { it.isNotBlank() }
-            .joinToString("\n")
+        if (!Native.isAvailable) return
+        if (uvOpen) {
+            uvStatusText.text = Native.nativeUvStatus().lineSequence()
+                .filter { it.isNotBlank() }
+                .joinToString("\n")
+        }
+        // A session opening, an undo step and a cancel all move the memory the editor holds, and this
+        // is the one function every one of them runs.
+        refreshMemoryLine()
     }
 
     private fun integerField(field: EditText, fallback: Int): Int =
@@ -778,6 +807,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         textureSummary.text = summary
         highlightLayers()
         showLayerTools()
+        refreshMemoryLine()
     }
 
     private fun selectLayer(id: Int) {
@@ -1216,7 +1246,38 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             sceneSummary.text = getString(R.string.hierarchy_none)
         }
         highlightRows()
+        refreshMemoryLine()
     }
+
+    /**
+     * The one number that says what this device is carrying, in the part it comes from. An import
+     * that succeeds and a canvas that then fails are the same story only in sequence, and the panel
+     * is where the user reads it.
+     */
+    private fun refreshMemoryLine() {
+        if (!Native.isAvailable) return
+        val parts = Native.nativeMemoryInfo()
+            .split(' ')
+            .mapNotNull { term ->
+                val key = term.substringBefore('=')
+                val value = term.substringAfter('=').toLongOrNull()
+                if (value == null) null else key to value
+            }
+            .toMap()
+        if (parts.isEmpty()) return
+        val total = parts.values.sum()
+        if (total <= 0L) {
+            memorySummary.text = getString(R.string.memory_empty)
+            return
+        }
+        fun side(key: String): String = megabytes(parts[key] ?: 0L)
+        memorySummary.text =
+            getString(R.string.memory_line, megabytes(total), side("source"), side("meshes"),
+                      side("layers"), side("edit"))
+    }
+
+    private fun megabytes(bytes: Long): String =
+        String.format(Locale.getDefault(), "%.1f", bytes / (1024.0 * 1024.0))
 
     private fun highlightRows() {
         rows.forEachIndexed { position, row ->

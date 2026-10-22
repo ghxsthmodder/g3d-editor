@@ -44,6 +44,14 @@ uint32_t Scene::totalTriangles() const {
     return total;
 }
 
+size_t Scene::memoryBytes() const {
+    size_t total = 0;
+    for (const Mesh &mesh : meshes_) {
+        total += mesh.memoryBytes();
+    }
+    return total;
+}
+
 int Scene::selected() const { return selected_; }
 
 void Scene::select(int index) {

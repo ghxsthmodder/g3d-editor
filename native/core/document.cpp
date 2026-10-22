@@ -58,6 +58,16 @@ std::string Document::describe() {
     return scene_.describe();
 }
 
+size_t Document::sourceBytes() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return source_.capacity();
+}
+
+size_t Document::meshBytes() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return scene_.memoryBytes();
+}
+
 std::string Document::hierarchy() {
     std::lock_guard<std::mutex> guard(mutex_);
     return scene_.hierarchy();

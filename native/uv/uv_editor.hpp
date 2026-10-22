@@ -63,6 +63,8 @@ public:
     void endGesture();
     // "desfazer=N refazer=M historico=KKB", for the status line.
     std::string history();
+    // What the open session holds, layout and history together; zero with no session.
+    size_t memoryBytes();
     // Whether the open session has steps the undo and redo buttons would walk. Saving a project
     // writes the scene, so the history behind an open session does not travel with the file.
     bool hasHistory();

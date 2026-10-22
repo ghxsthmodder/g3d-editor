@@ -55,8 +55,16 @@ respondem com erro em vez de deixar uma `std::bad_alloc` atravessar para a pilha
 de um arquivo pesado é limitada pelo orçamento de memória que o telefone informa**: um glTF de 4 MB
 que apontava 2000 nós para 4 malhas chegou a expandir em 28,7 milhões de vértices e um gigabyte e
 meio, o que fecha o processo antes de qualquer aviso; as referências repetidas no mesmo lugar agora
-são unidas e o que passaria do orçamento fica de fora, com o número dito na mensagem. O layout
-novo, o salvamento e a leitura via SAF ainda não foram validados em telefone.
+são unidas e o que passaria do orçamento fica de fora, com o número dito na mensagem. Ficar nos
+arquivos por onde o editor passou também está: **Recentes**, ao lado de Abrir e Salvar, guarda os
+cinco últimos com o nome e com o tipo que eram, e reabre cada um pelo caminho que o abriu da
+primeira vez — projeto ou modelo, decidido no registro e não pela extensão, porque o provedor
+devolve nomes sem ela. A cessão que o seletor deu é pedida de forma que sobreviva ao fechamento do
+app, e a linha
+de um arquivo que o aparelho não deixa mais ler sai da lista antes de ser oferecida, com a mensagem
+dizendo quantos saíram: prometer um arquivo que não abre é a mesma mentira de um botão que não age.
+O layout novo, o salvamento, a leitura via SAF e a lista de recentes ainda não foram validados em
+telefone.
 
 ## Compilar
 

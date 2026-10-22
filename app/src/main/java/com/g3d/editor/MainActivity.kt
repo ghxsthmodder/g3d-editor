@@ -1,6 +1,7 @@
 package com.g3d.editor
 
 import android.app.ActivityManager
+import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
@@ -24,6 +25,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.text.SimpleDateFormat
@@ -76,6 +78,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var workText: TextView
     private lateinit var workCancel: MaterialButton
     private lateinit var importButton: MaterialButton
+    private lateinit var recentButton: MaterialButton
     private lateinit var frameButton: MaterialButton
     private lateinit var logButton: MaterialButton
     private lateinit var shadingGroup: MaterialButtonToggleGroup
@@ -98,6 +101,11 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private val textureRows = mutableListOf<Pair<Int, View>>()
     private val textureStats = mutableMapOf<Int, String>()
     private val sizePresetRows = mutableListOf<LinearLayout>()
+
+    // Files this activity has read. What the picker hands over is good for as long as this screen
+    // lives, whether or not the durable grant was accepted, so an entry opened here is reachable.
+    private val sessionReadable = mutableSetOf<String>()
+    private val recentPrefs by lazy { getSharedPreferences(RECENT_PREFS, MODE_PRIVATE) }
 
     private val openModel =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -163,6 +171,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         workText = findViewById(R.id.workText)
         workCancel = findViewById(R.id.workCancel)
         importButton = findViewById(R.id.importModel)
+        recentButton = findViewById(R.id.projectRecent)
         frameButton = findViewById(R.id.frameScene)
         logButton = findViewById(R.id.toggleLog)
         shadingGroup = findViewById(R.id.shadingGroup)
@@ -204,6 +213,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         findViewById<View>(R.id.exportGlb).setOnClickListener { startModelExport(FORMAT_GLB) }
         findViewById<View>(R.id.projectSave).setOnClickListener { startProjectSave() }
         findViewById<View>(R.id.projectOpen).setOnClickListener { pickProject() }
+        findViewById<View>(R.id.projectRecent).setOnClickListener { showRecentFiles() }
+        // Dead entries are dropped before the first frame, so the button is only offered when every
+        // row of the list can actually be opened.
+        recentButton.isEnabled = pruneRecents().isNotEmpty()
         findViewById<View>(R.id.toggleInspector).setOnClickListener {
             if (inspectorPanel.visibility == View.VISIBLE) {
                 hideInspector()
@@ -1090,6 +1103,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         beginWork(getString(R.string.status_project_saving))
         Thread {
             val startedAt = System.currentTimeMillis()
+            var saved = false
             val message = try {
                 noteStage("salvando o projeto")
                 val bytes = Native.nativeProjectBytes()
@@ -1102,6 +1116,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                         ?: throw IllegalStateException(
                             getString(R.string.status_read_error, "fluxo indisponível"))
                     stream.use { it.write(bytes) }
+                    saved = true
                     getString(
                         R.string.status_project_saved,
                         uri.lastPathSegment ?: ("projeto" + PROJECT_EXTENSION),
@@ -1111,7 +1126,12 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             } catch (error: Throwable) {
                 getString(R.string.status_project_save_failed, error.message ?: "?")
             }
-            runOnUiThread { finishWork(message) }
+            runOnUiThread {
+                // A project that was written is a project that can be reopened, and it is the file
+                // the editor now points at: the recents list would be behind the truth without it.
+                if (saved) recordRecent(uri, displayName(uri), project = true, writable = true)
+                finishWork(message)
+            }
         }.start()
     }
 
@@ -1165,6 +1185,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     refreshHierarchy()
                     refreshTextureStack()
                     syncTextureCanvasField()
+                    recordRecent(uri, name, project = true, writable = false)
                 }
                 finishWork(message)
             }
@@ -1175,6 +1196,111 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun syncTextureCanvasField() {
         val match = CANVAS_PATTERN.find(Native.nativeTextureInfo()) ?: return
         textureCanvasField.setText(match.groupValues[1])
+    }
+
+    /**
+     * One row of the recents list: the file, the name it was read under, and whether it is a
+     * project. The kind is stored instead of guessed from the extension, because a `.g3dp` and a
+     * `.glb` are opened by different code and a provider is free to hand back a name without
+     * either.
+     */
+    private data class RecentEntry(val uri: String, val name: String, val project: Boolean) {
+        fun serialize(): String = "$uri\t$name\t${if (project) "1" else "0"}"
+    }
+
+    /**
+     * Puts the file at the head of the list, once: the same path opened twice moves to the front
+     * rather than doubling the row it already had.
+     */
+    private fun recordRecent(uri: Uri, name: String, project: Boolean, writable: Boolean) {
+        tryPersist(uri, writable)
+        sessionReadable.add(uri.toString())
+        val entry = RecentEntry(
+            uri.toString(), name.replace('\t', ' ').replace('\n', ' '), project)
+        val kept = (listOf(entry) + readRecents().filterNot { it.uri == entry.uri })
+            .take(MAX_RECENT)
+        recentPrefs.edit().putString(RECENT_KEY, kept.joinToString("\n") { it.serialize() }).apply()
+        recentButton.isEnabled = true
+    }
+
+    /**
+     * Asks the provider for a grant that outlives this activity. Without it the file is reachable
+     * only while the editor stays up, and the list would be a promise the next launch cannot keep;
+     * a refusal is not an error to show, because the entry simply goes when the app reopens.
+     */
+    private fun tryPersist(uri: Uri, writable: Boolean) {
+        val read = Intent.FLAG_GRANT_READ_URI_PERMISSION
+        if (writable && persistGrant(uri, read or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)) return
+        persistGrant(uri, read)
+    }
+
+    /** @return whether the provider handed the grant over. */
+    private fun persistGrant(uri: Uri, flags: Int): Boolean = try {
+        contentResolver.takePersistableUriPermission(uri, flags)
+        true
+    } catch (_: Throwable) {
+        false
+    }
+
+    private fun readRecents(): List<RecentEntry> {
+        val stored = recentPrefs.getString(RECENT_KEY, "").orEmpty()
+        return stored.lineSequence()
+            .filter { it.isNotBlank() }
+            .map { line -> line.split('\t') }
+            .filter { it.size >= 3 }
+            .map { RecentEntry(it[0], it[1], it[2] == "1") }
+            .toList()
+    }
+
+    private fun writeRecents(entries: List<RecentEntry>) {
+        recentPrefs.edit()
+            .putString(RECENT_KEY, entries.joinToString("\n") { it.serialize() })
+            .apply()
+    }
+
+    /**
+     * Reachable now, and not "reachable once": either the durable grant survived the restart, or
+     * this activity has read the file already and the picker's grant is still in force.
+     */
+    private fun canRead(entry: RecentEntry): Boolean {
+        if (sessionReadable.contains(entry.uri)) return true
+        val uri = Uri.parse(entry.uri)
+        return contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+    }
+
+    /**
+     * Drops the entries the device will not hand back and says how many went, so the list can offer
+     * a row and nothing in it can fail for a reason the user was not told.
+     */
+    private fun pruneRecents(): List<RecentEntry> {
+        val all = readRecents()
+        val reachable = all.filter { canRead(it) }
+        if (reachable.size != all.size) {
+            writeRecents(reachable)
+            report(getString(R.string.recent_dropped, all.size - reachable.size))
+        }
+        return reachable
+    }
+
+    private fun showRecentFiles() {
+        val entries = pruneRecents()
+        if (entries.isEmpty()) {
+            recentButton.isEnabled = false
+            return
+        }
+        val labels = entries.map {
+            getString(if (it.project) R.string.recent_project else R.string.recent_model, it.name)
+        }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.recent_title)
+            .setItems(labels) { _, index -> openRecent(entries[index]) }
+            .show()
+    }
+
+    /** Reopens a row of the list by the same path the picker used, so nothing about it is new. */
+    private fun openRecent(entry: RecentEntry) {
+        val uri = Uri.parse(entry.uri)
+        if (entry.project) readProject(uri) else importUri(uri)
     }
 
     /**
@@ -1289,6 +1415,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     viewport.refreshScene()
                     viewport.frameScene()
                     refreshHierarchy()
+                    recordRecent(uri, name, project = false, writable = false)
                 }
                 finishWork(message)
             }
@@ -1481,6 +1608,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun beginWork(message: String, stoppable: Boolean = false) {
         busy = true
         importButton.isEnabled = false
+        recentButton.isEnabled = false
         workRow.visibility = View.VISIBLE
         workCancel.visibility = if (stoppable) View.VISIBLE else View.GONE
         workCancel.isEnabled = true
@@ -1493,6 +1621,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun finishWork(message: String) {
         busy = false
         importButton.isEnabled = true
+        recentButton.isEnabled = readRecents().isNotEmpty()
         progressHandler.removeCallbacks(progressTicker)
         workRow.visibility = View.GONE
         noteStage(STAGE_CLEAN)
@@ -1640,6 +1769,13 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         // One line naming the heavy step in progress, and its absence. See noteStage.
         const val STAGE_FILE = "last_stage.txt"
         const val STAGE_CLEAN = "limpa"
+
+        // The recents list, in its own preferences file so nothing else in the editor rewrites it.
+        // Five: past that the list stops being the way back into the files in use and becomes an
+        // archive the dialog has to scroll through, which is the other screen, not this one.
+        const val RECENT_PREFS = "recentes"
+        const val RECENT_KEY = "lista"
+        const val MAX_RECENT = 5
 
         // "tela=256x256", the first line of the compositor summary.
         val CANVAS_PATTERN = Regex("tela=(\\d+)x(\\d+)")

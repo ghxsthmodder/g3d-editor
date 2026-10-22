@@ -56,6 +56,7 @@
     <string name="project_title">Projeto editável</string>
     <string name="project_open">Abrir</string>
     <string name="project_save">Salvar</string>
+    <string name="project_recent">Recentes</string>
     <string name="status_project_saving">gravando o projeto …</string>
     <string name="status_project_opening">abrindo o projeto %1$s …</string>
     <string name="status_project_saved">%1$s salvo (%2$s)</string>
@@ -64,6 +65,11 @@
     <string name="status_project_save_failed">o projeto não foi gravado: %1$s</string>
     <string name="status_project_save_cancelled">salvamento cancelado</string>
     <string name="status_project_empty">nada para salvar: não há modelo aberto</string>
+
+    <string name="recent_title">Arquivos recentes</string>
+    <string name="recent_model">%1$s — modelo</string>
+    <string name="recent_project">%1$s — projeto</string>
+    <string name="recent_dropped">%1$d saíram da lista: o arquivo não pode mais ser lido</string>
 
     <string name="uv_title">Editor UV</string>
     <string name="uv_generate_title">Geração</string>

@@ -47,10 +47,13 @@ Medidas do último *build* de depuração: `app-debug.apk` de 18.694.528 bytes (
 empacotados sem compressão. O módulo de projeto traz o RapidJSON que já vinha com o
 Assimp (cabeçalhos, instanciados onde o projeto é escrito e lido), e é dele boa parte desse aumento.
 É Debug com símbolos parciais, não Release: o número serve para acompanhar a tendência quando algo é
-incorporado, não como tamanho de distribuição. Os exportadores de OBJ e glTF do Assimp, ligados nesta
-contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais da interface são 28 arquivos XML que
-somam 13,5 KB de fonte; no APK eles entram no bloco de recursos compilados, que não é medido à parte
-aqui.
+incorporado, não como tamanho de distribuição. A forma de distribuição é menor:
+`assembleRelease` produz `app-release-unsigned.apk` de 11.392.684 bytes (10,9 MiB), com o
+`libg3dnative.so` despojado de 2.973.264 bytes (arm64-v8a) e 3.093.336 bytes (x86_64). É o APK sem
+assinatura: o bloco `META-INF` que a assinatura acrescenta não foi medido. Os exportadores de OBJ e
+glTF do Assimp, ligados nesta contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais da
+interface são 28 arquivos XML que somam 13,5 KB de fonte; no APK eles entram no bloco de recursos
+compilados, que não é medido à parte aqui.
 
 ## Conferir a ponte JNI
 

@@ -71,4 +71,7 @@ Requisitos e detalhes em [docs/BUILD.md](docs/BUILD.md).
 
 - `app/` — interface Android (Kotlin, Material, paisagem, tema escuro).
 - `native/` — núcleo C++ (malha, cena, importação Assimp, UV/xatlas, renderizador GLES), JNI e CMake.
-- `third_party/` — bibliotecas incorporadas, versões e licenças.
+- `third_party/` — bibliotecas incorporadas, versões e licenças. A auditoria das licenças está lá
+  registrada, componente por componente, medida no binário ligado e não no que existe em disco: os
+  `contrib/` do Assimp que o *build* compila e o ligador descarta aparecem um por um, com o comando
+  de conferir. O que distribuir ainda é aberto: falta o lugar onde os avisos vão aparecer.

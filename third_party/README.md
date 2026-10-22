@@ -19,7 +19,10 @@ licença e os arquivos mantidos.
 - Finalidade: importação de OBJ, glTF e GLB e exportação dos mesmos três formatos.
 - Repositório: https://github.com/assimp/assimp
 - Versão: tag `v6.0.5`, commit `392a658f9c271be965271f45e7521a1b80ea4392`.
-- Licença: ISC (arquivo `LICENSE`), que cobre também os subcomponentes em `contrib/`.
+- Licença: a licença da Open Asset Import Library, no arquivo `LICENSE` — três condições de
+  redistribuição do tipo BSD-3-Clause, copyright `2006-2026 assimp team`. **Não é ISC**, e o texto
+  **não cobre os componentes de `contrib/`**: ele traz aviso próprio apenas para os modelos de teste
+  não-BSD e para o Poly2Tri. Cada contrib tem a sua licença, na tabela abaixo.
 - Arquivos mantidos: `CMakeLists.txt`, `assimp.pc.in`, `code/`, `include/`, `cmake-modules/` e os
   diretórios de `contrib/` exigidos pelo build (`zlib`, `zip`, `unzip`, `rapidjson`, `pugixml`,
   `utf8cpp`, `stb`, `poly2tri`, `earcut-hpp`, `clipper`, `openddlparser`, `Open3DGC`, `meshlab`).
@@ -45,6 +48,43 @@ licença e os arquivos mantidos.
   xatlas, tem o caminho inverso — `ProgressFunc` devolve o bool e a biblioteca obedece — e é a
   única operação com botão de interromper no app. Conferido nesta tag, não por suposição;
   medição: um OBJ de 106 MB leva 10,4 s no host, das quais 9,7 s são dentro do Assimp.
+
+## Componentes dentro do Assimp (`contrib/`)
+
+A auditoria foi feita em duas perguntas separadas, porque as respostas diferem: o *build* do Assimp
+compila mais do que o produto carrega. "Compilado" conta arquivos `.o` no diretório de *build* do
+NDK (arm64, Depuração); "chega ao `.so`" é censo de símbolos do `libg3dnative.so` ligado, e um
+arquivo estático só é puxado para dentro se algum símbolo dele for referenciado.
+
+| Componente | Licença (texto no tree) | Compilado | Chega ao `.so` |
+| --- | --- | --- | --- |
+| `zlib` | zlib, `(C) 1995-2022 Jean-loup Gailly and Mark Adler` (`contrib/zlib/LICENSE`) | 30 obj | não — nenhum `inflate`/`deflate` |
+| `openddlparser` | MIT, `(c) 2014 Kim Kulling` (`contrib/openddlparser/LICENSE`) | 12 obj | não — COLLADA está desligado |
+| `poly2tri` | BSD-3-Clause, `Poly2Tri Contributors` (`contrib/poly2tri/LICENSE`, reproduzido no `LICENSE` do Assimp) | 10 obj | não |
+| `unzip` (MiniZip64) | condições do zlib, `(c) 1998-2010 Gilles Vollant` e Mathias Svensson (`contrib/unzip/MiniZip64_info.txt`) | 4 obj | não |
+| `pugixml` | MIT, `(c) 2006-2026 Arseny Kapoulkine` (`contrib/pugixml/LICENSE.md`) | 2 obj | não |
+| `clipper` | Boost Software License 1.0 (`contrib/clipper/License.txt`) | 2 obj | não |
+| `Open3DGC` | BSD-3-Clause, `(c) 2004 Amir Said e William A. Pearlman` (cabeçalho de cada arquivo) | não | não — VRML desligado |
+| `zip` | domínio público (`contrib/zip/UNLICENSE`) | não | não |
+| `stb` (cópia do Assimp) | domínio público / MIT (`contrib/stb/stb_image.h`) | não | não — a cópia que usamos é `third_party/stb` |
+| `earcut-hpp` | ISC, `(c) 2015 Mapbox` (`contrib/earcut-hpp/LICENSE`) | não (header-only) | não |
+| `utf8cpp` | Boost Software License 1.0 (`contrib/utf8cpp/doc/LICENSE`) | não (header-only) | não |
+| `meshlab` | só `README.md` e `patches/` no tree; o código é clonado sob demanda pelo Assimp e a fonte tem GPL | não | não |
+| `rapidjson` | MIT, nota da Tencent (`contrib/rapidjson/license.txt`) | header-only | **sim** — pelo nosso `native/project/project_io.cpp`, não pelo Assimp |
+
+Como conferir, depois de um `assembleDebug`:
+
+```bash
+SO=app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/arm64-v8a/libg3dnative.so
+for p in _ZN2p2t _ZN5o3dgc OpenDDL _ZN4pugi _ZN7Clipper inflate unzOpen _ZN4Utf8 zm_; do
+  printf "%-12s %s\n" "$p" "$(nm "$SO" | grep -cE "$p")"
+done
+nm "$SO" | grep -cE '_ZN6xatlas|Assimp|rapidjson|stbi_'   # o que realmente está lá
+```
+
+O que se pode tirar da tabela, amanhã, é que desligar ou ligar um importador muda o binário sem
+mudar o tree: os seis primeiros componentes são construídos e depois descartados pelo ligador, e a
+lista de licenças a reproduzir precisa ser refeita sobre o `.so` — não sobre o que está em disco.
 
 ## stb
 
@@ -81,8 +121,9 @@ licença e os arquivos mantidos.
 - Finalidade: ler e escrever a descrição JSON do arquivo de projeto `.g3dp`.
 - Repositório: https://github.com/Tencent/rapidjson — não foi baixado à parte; é a cópia que vem em
   `third_party/assimp/contrib/rapidjson`, que o próprio Assimp usa no importador de glTF.
-- Licença: MIT (`third_party/assimp/contrib/rapidjson/license.txt`, com a nota da Tencent). Está
-  também sob a declaração ISC do Assimp, que cobre os componentes de `contrib/`.
+- Licença: MIT (`third_party/assimp/contrib/rapidjson/license.txt`, com a nota da Tencent e a lista
+  de terceiros que ela acompanha). Não vem sob a licença do Assimp — o texto do Assimp não cobre os
+  `contrib/`, como registro na tabela acima.
 - Arquivos usados: só os cabeçalhos de `include/rapidjson` (`document.h`, `stringbuffer.h`,
   `writer.h`). Nada é compilado à parte — RapidJSON é header-only.
 - Como entra: `native/CMakeLists.txt` adiciona `contrib/rapidjson/include` a `G3D_INCLUDES`, e
@@ -117,7 +158,26 @@ licença e os arquivos mantidos.
 
 ## Advertências de licença exigidas na distribuição
 
-Ao distribuir o APK, as cópias de licença MIT/ISC/Unlicense das bibliotecas acima devem ser
-incluídas (por exemplo, em uma tela "Sobre/Licenças" ou em `app/src/main/assets/NOTICE`). Isso é
-obrigatório antes de qualquer publicação; enquanto o app só roda em desenvolvimento local, os
-arquivos `LICENSE` versionados aqui servem de registro.
+Conferido na fonte de cada cópia, nesta configuração, em 2026-10-23. O que a distribuição precisa
+reproduzir, e onde está a obrigação:
+
+| Peça | Licença | Obrigação prática |
+| --- | --- | --- |
+| xatlas `f700c77` | MIT | conservar aviso e texto |
+| Assimp `v6.0.5` | BSD-3-Clause (texto da própria biblioteca) | conservar aviso e texto nas duas redistribuições; a cláusula de endosso proíbe vender o app como "Assimp" |
+| `contrib/rapidjson` (cabeçalhos que usamos) | MIT + nota da Tencent | conservar aviso e texto |
+| stb `a7d4c21` | MIT *ou* Unlicense, à nossa escolha | sob Unlicense nada é exigido; sob MIT o aviso e o texto acompanham a redistribuição. As duas cópias estão no arquivo, e a escolha fica para quem publicar |
+| GLM `1.0.2` | MIT | conservar aviso e texto |
+| Material Components `1.12.0` | Apache-2.0 | aviso + texto + nota `NOTICE`, se houver |
+| Material Icons `3.0.1` | Apache-2.0 | aviso + texto; a cópia vendorizada não trouxe arquivo `NOTICE` — se um *build* futuro do upstream trouxer, ele acompanha |
+| meshoptimizer | — | **não incorporado**, nenhuma obrigação |
+
+Os seis `contrib/` compilados e descartados pelo ligador não chegam ao `.so` hoje, então o texto
+deles não é exigido na distribuição de agora — mas passa a ser no dia em que um importador que os
+usa for ligado, e a tabela de cima é o que diz isso sem repetir a medição.
+
+Como distribuir os avisos, ainda não decidido: uma tela "Sobre/Licenças" dentro do app ou um
+`app/src/main/assets/NOTICE` empacotado com os textos. Enquanto o editor só roda em desenvolvimento
+local, as cópias versionadas aqui servem de registro — nenhum APK foi publicado. A tela é o caminho
+que combina com o plano (as informações do documento já ficam visíveis no inspetor, e PLAN pede
+atribuições visíveis antes de distribuir), e ela tem de existir antes de qualquer publicação.

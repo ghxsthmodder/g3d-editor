@@ -63,6 +63,7 @@ std::vector<unsigned char> readPixels() {
     return pixels;
 }
 
+
 bool matches(const std::vector<unsigned char> &pixels, size_t pixel, float red, float green,
              float blue, float tolerance = 6.0f) {
     const size_t offset = pixel * 4;
@@ -70,6 +71,48 @@ bool matches(const std::vector<unsigned char> &pixels, size_t pixel, float red, 
     return std::abs(pixels[offset + 0] - red * scale) <= tolerance &&
            std::abs(pixels[offset + 1] - green * scale) <= tolerance &&
            std::abs(pixels[offset + 2] - blue * scale) <= tolerance;
+}
+
+// The offset that lines one colour up with itself, in surface pixels: the column and the row counted
+// from the top, the way a finger moves. A dragged island is a rigid shape, so the best alignment is
+// the drag, and an outline clipped by the edge of the panel does not skew it the way it skews the
+// centre of the shape. Returns how many pixels line up.
+int colourShift(const std::vector<unsigned char> &before, const std::vector<unsigned char> &after,
+                 int fromX, int toX, float red, float green, float blue, int out[2]) {
+    int bestScore = 0;
+    out[0] = 0;
+    out[1] = 0;
+    for (int offsetY = -6; offsetY <= 6; ++offsetY) {
+        for (int offsetX = -6; offsetX <= 6; ++offsetX) {
+            int score = 0;
+            for (int row = 0; row < kSize; ++row) {
+                // glReadPixels returns the bottom row first, so a surface row grows downwards from
+                // the offset above by reading the other image further up.
+                const int sourceRow = row + offsetY;
+                if (sourceRow < 0 || sourceRow >= kSize) {
+                    continue;
+                }
+                for (int column = fromX; column < toX; ++column) {
+                    const int sourceColumn = column - offsetX;
+                    if (sourceColumn < fromX || sourceColumn >= toX) {
+                        continue;
+                    }
+                    if (matches(before, static_cast<size_t>(sourceRow) * kSize + sourceColumn, red,
+                                green, blue, 8.0f) &&
+                        matches(after, static_cast<size_t>(row) * kSize + column, red, green, blue,
+                                8.0f)) {
+                        ++score;
+                    }
+                }
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                out[0] = offsetX;
+                out[1] = offsetY;
+            }
+        }
+    }
+    return bestScore;
 }
 
 // Pixels where the layer green beats the canvas blue, whatever the wireframe left on top of it.
@@ -407,6 +450,66 @@ int main() {
     }
     check(shiftedChannels > 100,
           "arrastar uma ilha muda o atlas, canais=" + std::to_string(shiftedChannels));
+
+    // --- dragging with a finger moves the island by the same number of pixels -------------
+    // The translation above left the islands half outside the atlas square, so they are fitted back
+    // in before measuring, and the grab starts from an empty selection to see what it selects.
+    check(editor.fit(), "reajustar as ilhas antes de medir o arrasto funciona");
+    editor.clearSelection();
+
+    // Which island lands on which pixel is the packer's choice, so the point the grab is asked about
+    // is looked for in the atlas instead of assumed from where the islands were expected to be.
+    float islandPixel[2] = {0.0f, 0.0f};
+    bool foundIsland = false;
+    for (int row = 0; row < kSize && !foundIsland; ++row) {
+        for (int column = kAtlasLeft; column < kSize && !foundIsland; ++column) {
+            float uv[2];
+            if (!renderer.uvAt(static_cast<float>(column), static_cast<float>(row), uv)) {
+                continue;
+            }
+            if (editor.pick(uv[0], uv[1]) != 0) {
+                continue;
+            }
+            islandPixel[0] = static_cast<float>(column);
+            islandPixel[1] = static_cast<float>(row);
+            foundIsland = true;
+        }
+    }
+    check(foundIsland, "a primeira ilha tem um pixel para agarrar, coluna=" +
+                           std::to_string(islandPixel[0]) + " linha=" +
+                           std::to_string(islandPixel[1]));
+    check(!renderer.uvGrab(static_cast<float>(kAtlasLeft) - 10.0f, 10.0f, false),
+          "agarrar fora do atlas nao pega ilha nenhuma");
+    check(!editor.isSelected(0u), "sem agarrar, a primeira ilha continua fora da selecao");
+    check(renderer.uvGrab(islandPixel[0], islandPixel[1], false),
+          "agarrar uma ilha sem selecao funciona");
+    check(editor.isSelected(0u), "o arrasto seleciona a ilha que foi agarrada");
+
+    renderer.draw();
+    const std::vector<unsigned char> beforeDrag = readPixels();
+    const int amberDragged = countColorIn(beforeDrag, kAtlasLeft, kSize, kOutlineColor[0],
+                                          kOutlineColor[1], kOutlineColor[2], 8.0f);
+    check(amberDragged > 20,
+          "a ilha agarrada aparece em ambar, pixels=" + std::to_string(amberDragged));
+    renderer.uvDragPixels(-2.0f, 2.0f);
+    renderer.draw();
+    const std::vector<unsigned char> afterDrag = readPixels();
+    maybePreview(std::getenv("G3D_RENDER_PREVIEW"), "arrastar_ilha", afterDrag);
+    int shift[2] = {0, 0};
+    const int aligned = colourShift(beforeDrag, afterDrag, kAtlasLeft, kSize, kOutlineColor[0],
+                                    kOutlineColor[1], kOutlineColor[2], shift);
+    check(shift[0] == -2 && shift[1] == 2 && aligned * 2 > amberDragged,
+          "arrastar 2 pixels move a ilha 2 pixels, coluna=" + std::to_string(shift[0]) +
+              " linha=" + std::to_string(shift[1]) + " alinhados=" + std::to_string(aligned) +
+              " de " + std::to_string(amberDragged));
+
+    // Grabbing an island that is already in the group leaves the group alone. Handing it to select()
+    // again would toggle it off, and a selection of two islands would shrink without anyone asking.
+    check(editor.select(1u, true), "somar uma segunda ilha a selecao funciona");
+    check(renderer.uvGrab(islandPixel[0], islandPixel[1], false),
+          "agarrar uma ilha ja selecionada funciona");
+    check(editor.isSelected(0u) && editor.isSelected(1u),
+          "agarrar o grupo nao desfaz nenhuma ilha dele");
 
     // --- repacking separates the islands -----------------------------------------------
     // Once the islands no longer share UV space the warning colour has to leave the atlas: the

@@ -1,5 +1,7 @@
 #include "uv/uv_editor.hpp"
 
+#include <algorithm>
+
 #include "core/document.hpp"
 
 namespace g3d {
@@ -160,6 +162,20 @@ bool UvEditor::fit() {
 
 bool UvEditor::repack(uint32_t paddingTexels) {
     return edit([paddingTexels](UvSession &session) { return session.repack(paddingTexels); });
+}
+
+bool UvEditor::isSelected(uint32_t island) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    if (!active_) {
+        return false;
+    }
+    const std::vector<uint32_t> &selection = session_.selection();
+    return std::find(selection.begin(), selection.end(), island) != selection.end();
+}
+
+size_t UvEditor::selectionCount() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return active_ ? session_.selection().size() : 0u;
 }
 
 bool UvEditor::selectionPivot(float out[2]) {

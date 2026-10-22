@@ -1001,6 +1001,44 @@ void Renderer::uvAffine(const int rect[4], float out[4]) const {
     out[3] = -2.0f * panY / height - out[1] * 0.5f;
 }
 
+bool Renderer::uvGrab(float xPixels, float yPixels, bool additive) {
+    UvEditor &editor = UvEditor::instance();
+    float uv[2];
+    // Outside the atlas square the gesture belongs to the 3D view, whatever the selection is.
+    if (!uvAt(xPixels, yPixels, uv)) {
+        return false;
+    }
+    const int island = editor.pick(uv[0], uv[1]);
+    // select() toggles, so an island already in the group must not be handed to it: dragging a
+    // multi-island selection by one of its members would otherwise drop that member.
+    if (island >= 0) {
+        const uint32_t index = static_cast<uint32_t>(island);
+        if (!editor.isSelected(index)) {
+            editor.select(index, additive);
+        }
+    }
+    return editor.selectionCount() > 0;
+}
+
+// The affine maps UV to clip space, so one surface pixel is 2 / (scale * panelWidth) of a UV unit
+// on that axis. Clip Y grows upwards while surface Y grows downwards, which is the minus sign on
+// the vertical axis: the island follows the finger.
+void Renderer::uvDragPixels(float dxPixels, float dyPixels) {
+    int rect[4];
+    rectOf(1, rect);
+    if (rect[2] <= 0 || rect[3] <= 0) {
+        return;
+    }
+    float affine[4];
+    uvAffine(rect, affine);
+    if (affine[0] == 0.0f || affine[1] == 0.0f) {
+        return;
+    }
+    const float du = 2.0f * dxPixels / (affine[0] * static_cast<float>(rect[2]));
+    const float dv = -2.0f * dyPixels / (affine[1] * static_cast<float>(rect[3]));
+    UvEditor::instance().translate(du, dv);
+}
+
 bool Renderer::uvAt(float xPixels, float yPixels, float out[2]) {
     int rect[4];
     rectOf(1, rect);

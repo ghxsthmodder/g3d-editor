@@ -82,6 +82,15 @@ object Native {
     external fun nativeViewSetMode(mode: Int)
 
     external fun nativeSetSplitRatio(ratio: Float)
+
+    /**
+     * Asks what a drag starting at a surface point would move, and makes that island part of the
+     * selection. False means the gesture moves no islands, so the atlas should pan instead.
+     */
+    external fun nativeUvGrab(x: Float, y: Float, additive: Boolean): Boolean
+
+    external fun nativeUvDragPixels(dx: Float, dy: Float)
+
     external fun nativeUvPan(dx: Float, dy: Float)
 
     external fun nativeUvZoom(factor: Float)

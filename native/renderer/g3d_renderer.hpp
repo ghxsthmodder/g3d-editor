@@ -74,6 +74,14 @@ public:
     // Atlas coordinates under a pixel given in surface coordinates with Y growing downwards.
     // False when the atlas is hidden or the point falls outside its square.
     bool uvAt(float xPixels, float yPixels, float out[2]);
+    // Takes the islands under a surface point for a drag. An island outside the selection becomes it,
+    // or joins it when additive; one already inside leaves the group alone. A point on empty atlas
+    // changes nothing and just asks whether the current selection can be moved, so what is highlighted
+    // is always what follows the finger. False means this gesture moves no islands: outside the atlas
+    // square, or nothing selected to drag.
+    bool uvGrab(float xPixels, float yPixels, bool additive);
+    // Moves what the grab took by a drag measured in surface pixels.
+    void uvDragPixels(float dxPixels, float dyPixels);
 
 private:
     Renderer() = default;

@@ -531,6 +531,15 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         viewport.requestRender()
     }
 
+    /**
+     * A drag edited the session and, if it grabbed a new island, selected it without a tap. Same
+     * readout the arrow buttons leave behind, so the panel cannot disagree with the atlas.
+     */
+    override fun onIslandsMoved() {
+        refreshUvStatus()
+        viewport.requestRender()
+    }
+
     // --- compositor de texturas -------------------------------------------------------------
 
     private fun openTexturePanel() {

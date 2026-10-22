@@ -341,6 +341,17 @@ JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeSetSplitRatio(JNIEnv *, 
     g3d::Renderer::instance().setSplitRatio(ratio);
 }
 
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvGrab(JNIEnv *, jclass, jfloat x,
+                                                                   jfloat y,
+                                                                   jboolean additive) {
+    return g3d::Renderer::instance().uvGrab(x, y, additive == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeUvDragPixels(JNIEnv *, jclass, jfloat dx,
+                                                                     jfloat dy) {
+    g3d::Renderer::instance().uvDragPixels(dx, dy);
+}
+
 JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeUvPan(JNIEnv *, jclass, jfloat dx,
                                                               jfloat dy) {
     g3d::Renderer::instance().uvPan(dx, dy);

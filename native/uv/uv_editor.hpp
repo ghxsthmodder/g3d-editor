@@ -42,6 +42,11 @@ public:
     void selectAll();
     void clearSelection();
     int pick(float u, float v);
+    // Whether the island is part of what a tool would act on. A drag that grabs an already selected
+    // island has to move the whole group instead of quietly narrowing it.
+    bool isSelected(uint32_t island);
+    // How many islands a tool would act on. False for an empty selection, which no drag can move.
+    size_t selectionCount();
     bool translate(float du, float dv);
     bool rotate(float angleRadians, float pivotU, float pivotV);
     bool scale(float factor, float pivotU, float pivotV);

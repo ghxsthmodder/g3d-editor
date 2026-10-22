@@ -10,9 +10,10 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * 3D viewport, and the atlas panel the renderer draws next to it. One finger orbits the model or
- * drags the atlas, two fingers pan, pinch zooms, a tap selects a mesh or a UV island. Which of the
- * two a gesture belongs to is decided by where it started, asked from the native side.
+ * 3D viewport, and the atlas panel the renderer draws next to it. One finger orbits the model, and on
+ * the atlas it drags the islands that are selected, or pans the view when nothing is. Two fingers
+ * pan, pinch zooms, a tap selects a mesh or a UV island. Which of the two a gesture belongs to is
+ * decided by where it started, asked from the native side.
  * Every call that touches GL or the native camera is posted to the GL thread with queueEvent.
  */
 class ModelView @JvmOverloads constructor(
@@ -23,6 +24,11 @@ class ModelView @JvmOverloads constructor(
     interface Listener {
         fun onMeshPicked(index: Int)
         fun onIslandPicked(island: Int, additive: Boolean)
+        /**
+         * A drag moved the islands and, by grabbing one, may have changed the selection without a
+         * tap. The panel readout comes from the session, so it only has to be read again.
+         */
+        fun onIslandsMoved() {}
     }
 
     var listener: Listener? = null
@@ -37,6 +43,10 @@ class ModelView @JvmOverloads constructor(
     private var lastMidY = 0f
     private var dragDistance = 0f
     private var gestureOnAtlas = false
+    private var downX = 0f
+    private var downY = 0f
+    private var grabResolved = false
+    private var draggingIslands = false
 
     private val uvPoint = FloatArray(2)
 
@@ -131,7 +141,11 @@ class ModelView @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 lastX = event.x
                 lastY = event.y
+                downX = event.x
+                downY = event.y
                 dragDistance = 0f
+                grabResolved = false
+                draggingIslands = false
                 gestureOnAtlas = Native.nativeUvAt(event.x, event.y, uvPoint)
             }
 
@@ -141,6 +155,9 @@ class ModelView @JvmOverloads constructor(
                 lastMidX = mid[0]
                 lastMidY = mid[1]
                 dragDistance = tapSlopPx + 1f
+                // A second finger turns the gesture into pan or zoom, whatever it started on.
+                grabResolved = true
+                draggingIslands = false
             }
 
             MotionEvent.ACTION_MOVE -> {
@@ -152,7 +169,17 @@ class ModelView @JvmOverloads constructor(
                     dragDistance += abs(dx) + abs(dy)
                     if (dragDistance > tapSlopPx) {
                         if (gestureOnAtlas) {
-                            Native.nativeUvPan(dx, dy)
+                            // Which of the two the atlas does is decided once, by what was under the
+                            // finger when the gesture crossed the slop.
+                            if (!grabResolved) {
+                                grabResolved = true
+                                draggingIslands = Native.nativeUvGrab(downX, downY, additiveSelection)
+                            }
+                            if (draggingIslands) {
+                                Native.nativeUvDragPixels(dx, dy)
+                            } else {
+                                Native.nativeUvPan(dx, dy)
+                            }
                             requestRender()
                         } else {
                             // The render request is queued behind the gesture so the frame always shows
@@ -208,11 +235,20 @@ class ModelView @JvmOverloads constructor(
                             post { listener?.onMeshPicked(hit) }
                         }
                     }
+                } else if (draggingIslands) {
+                    // The grab may have re-selected without a tap, and the drag edited the session.
+                    post { listener?.onIslandsMoved() }
                 }
                 dragDistance = 0f
+                grabResolved = false
+                draggingIslands = false
             }
 
-            MotionEvent.ACTION_CANCEL -> dragDistance = 0f
+            MotionEvent.ACTION_CANCEL -> {
+                dragDistance = 0f
+                grabResolved = false
+                draggingIslands = false
+            }
         }
         return true
     }

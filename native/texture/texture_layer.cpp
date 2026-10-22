@@ -49,10 +49,19 @@ bool sampleBilinear(const Image &image, float sx, float sy, float out[4]) {
 }  // namespace
 
 bool TextureComposition::setCanvas(int width, int height, std::string &error) {
-    if (width <= 0 || height <= 0 || width > kMaxCanvasSide || height > kMaxCanvasSide ||
-        static_cast<long long>(width) * height > kMaxImagePixels) {
-        error = "a tela do compositor precisa ficar entre 1 e " + std::to_string(kMaxCanvasSide) +
-                " px por lado";
+    // The device limit is the smaller of the two ceilings, and is named in the refusal:
+    // "4096" means nothing to someone whose phone said 2048. The two ceilings are reported apart
+    // because they fail apart: a 8192x4096 canvas is inside every side limit and over the budget.
+    const int side = deviceLimit_ > 0 ? std::min(deviceLimit_, kMaxCanvasSide) : kMaxCanvasSide;
+    if (width <= 0 || height <= 0 || width > side || height > side) {
+        error = "a tela do compositor precisa ficar entre 1 e " + std::to_string(side) +
+                " px por lado" + (deviceLimit_ > 0 ? ", e o limite veio desta GPU" : "");
+        return false;
+    }
+    if (static_cast<long long>(width) * height > kMaxImagePixels) {
+        error = "a tela de " + std::to_string(width) + "x" + std::to_string(height) +
+                " px passa do orçamento de memória do editor, que é de " +
+                std::to_string(kMaxImagePixels / 1000000) + " MP";
         return false;
     }
     canvasWidth_ = width;
@@ -92,7 +101,7 @@ const TextureLayer *TextureComposition::layer(int id) const {
 size_t TextureComposition::memoryBytes() const {
     size_t bytes = 0;
     for (const TextureLayer &layer : layers_) {
-        bytes += layer.image.pixels.size();
+        bytes += layer.image.memoryBytes();
     }
     return bytes;
 }

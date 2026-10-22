@@ -278,6 +278,7 @@ bool Renderer::onContextCreated() {
     uvTextureVertexBuffer_ = 0;
     texture_ = 0;
     checkerTexture_ = 0;
+    maxTextureSide_ = 0;
     textureRevision_ = 0;
     hasTexture_ = false;
     uniformTexture_ = -1;
@@ -296,6 +297,12 @@ bool Renderer::onContextCreated() {
     }
     glEnable(GL_DEPTH_TEST);
     glClearColor(kBackground[0], kBackground[1], kBackground[2], 1.0f);
+    // The ceiling of the driver becomes the ceiling of the canvas: mobile GPUs differ in it and the
+    // editor must not offer a resolution this surface cannot sample.
+    GLint side = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &side);
+    maxTextureSide_ = side > 0 ? static_cast<int>(side) : 0;
+    TextureStudio::instance().setDeviceLimit(maxTextureSide_);
     contextReady_ = true;
     uploadScene();
     return true;
@@ -660,7 +667,11 @@ void Renderer::rectOf(int part, int out[4]) const {
 // Composing is CPU work and the compositor already made the picture top-down, the way a PNG stores
 // it; GL reads its first row at v = 0, so the rows are flipped once here and every consumer can
 // sample v straight from the UVs.
-void Renderer::uploadTextureImage(GLuint name, const Image &image) {
+bool Renderer::uploadTextureImage(GLuint name, const Image &image) {
+    // The flip below is the cost of the upload; an over-sized picture is refused before paying it.
+    if (maxTextureSide_ > 0 && (image.width > maxTextureSide_ || image.height > maxTextureSide_)) {
+        return false;
+    }
     const size_t stride = static_cast<size_t>(image.width) * 4;
     uploadScratch_.assign(image.pixels.size(), 0);
     for (int row = 0; row < image.height; ++row) {
@@ -677,6 +688,7 @@ void Renderer::uploadTextureImage(GLuint name, const Image &image) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
+    return true;
 }
 
 void Renderer::refreshTexture() {
@@ -690,7 +702,9 @@ void Renderer::refreshTexture() {
             if (texture_ == 0) {
                 glGenTextures(1, &texture_);
             }
-            uploadTextureImage(texture_, picture);
+            // A picture this context cannot hold leaves the preview without a texture: the model
+            // draws in the flat shading, the canvas and the exported PNG are untouched.
+            hasTexture_ = uploadTextureImage(texture_, picture);
         }
     }
 

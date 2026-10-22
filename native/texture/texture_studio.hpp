@@ -20,6 +20,13 @@ public:
     static TextureStudio &instance();
 
     bool setCanvas(int width, int height, std::string &error);
+    // What the GL driver reported as its biggest texture side, told to the canvas rules.
+    // Called from the GL thread when the context is created, and again if a second device
+    // takes the surface.
+    void setDeviceLimit(int side);
+    // What the canvas rules currently allow per side, 0 while no GL context has reported. The
+    // interface reads it to dim the resolutions this device cannot sample.
+    int deviceLimit() const;
     int canvasWidth() const;
     int canvasHeight() const;
     void setBackground(const uint8_t rgb[3]);

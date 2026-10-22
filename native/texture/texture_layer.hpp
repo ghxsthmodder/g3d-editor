@@ -34,6 +34,13 @@ public:
     int canvasWidth() const { return canvasWidth_; }
     int canvasHeight() const { return canvasHeight_; }
 
+    // The biggest texture this GPU can be given, read from the driver once the context
+    // exists. Zero means nobody has said, which is the state a CPU-only build or a host test
+    // starts in. The canvas is the texture the model samples, so a side above it is refused
+    // before anything is allocated.
+    void setDeviceLimit(int side) { deviceLimit_ = side > 0 ? side : 0; }
+    int deviceLimit() const { return deviceLimit_; }
+
     void setBackground(const uint8_t rgb[3]);
     void background(uint8_t out[3]) const;
 
@@ -72,6 +79,7 @@ private:
 
     int canvasWidth_ = 0;
     int canvasHeight_ = 0;
+    int deviceLimit_ = 0;
     uint8_t background_[3] = {46, 50, 60};
     std::vector<TextureLayer> layers_;
     int nextId_ = 1;

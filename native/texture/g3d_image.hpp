@@ -25,6 +25,9 @@ struct Image {
 
     // Reserves width x height filled with the given colour. False on a size that would not fit.
     bool allocate(int width, int height, const uint8_t fill[4]);
+
+    // The pixels themselves, which is what the panel adds up for the memory line.
+    size_t memoryBytes() const { return pixels.size(); }
 };
 
 // Importing a 90 MB texture into an app that also holds a mesh and an atlas would only crash, so

@@ -24,6 +24,16 @@ bool TextureStudio::setCanvas(int width, int height, std::string &error) {
     return true;
 }
 
+void TextureStudio::setDeviceLimit(int side) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    composition_.setDeviceLimit(side);
+}
+
+int TextureStudio::deviceLimit() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return composition_.deviceLimit();
+}
+
 int TextureStudio::canvasWidth() const {
     std::lock_guard<std::mutex> guard(mutex_);
     return composition_.canvasWidth();
@@ -156,7 +166,8 @@ size_t TextureStudio::layerCount() const {
 
 size_t TextureStudio::memoryBytes() const {
     std::lock_guard<std::mutex> guard(mutex_);
-    return composition_.memoryBytes();
+    // The composed picture is the one buffer nobody sees in the layer list, and it is canvas sized.
+    return composition_.memoryBytes() + composed_.memoryBytes();
 }
 
 bool TextureStudio::renderLocked(Image &out, std::string &error) {
@@ -203,7 +214,9 @@ std::string TextureStudio::describe() const {
     char colour[16];
     std::snprintf(colour, sizeof(colour), "#%02X%02X%02X", rgb[0], rgb[1], rgb[2]);
     stream << " camadas=" << composition_.layers().size() << " fundo=" << colour
-           << " mem=" << (static_cast<double>(composition_.memoryBytes()) / (1024.0 * 1024.0))
+           << " mem="
+           << (static_cast<double>(composition_.memoryBytes() + composed_.memoryBytes()) /
+               (1024.0 * 1024.0))
            << "MB";
     return stream.str();
 }
@@ -229,7 +242,11 @@ std::string TextureStudio::layerRows() const {
 
 void TextureStudio::reset() {
     std::lock_guard<std::mutex> guard(mutex_);
+    // The driver's ceiling is a fact about the device, not about the stack: an import or a project
+    // opening throws the pictures away, and the next canvas still has to fit this GPU.
+    const int limit = composition_.deviceLimit();
     composition_ = TextureComposition();
+    composition_.setDeviceLimit(limit);
     composed_.clear();
     dirty_ = true;
     ++revision_;

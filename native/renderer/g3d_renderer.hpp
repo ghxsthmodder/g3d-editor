@@ -125,7 +125,9 @@ private:
     // Uploads the composed picture when the compositor moved on, and builds the reference grid the
     // first time it is asked for. Runs on the GL thread, from draw().
     void refreshTexture();
-    void uploadTextureImage(GLuint name, const Image &image);
+    // False when the picture is bigger than this GL context can hold, which is the one failure the
+    // preview can have and still leave the editor usable.
+    bool uploadTextureImage(GLuint name, const Image &image);
     void drawUvBackground(const float affine[4]);
 
     GLuint program_ = 0;
@@ -137,6 +139,9 @@ private:
     std::vector<Item> items_;
 
     GLuint texture_ = 0;            // The composed atlas.
+    // GL_MAX_TEXTURE_SIZE of this context, 0 when the driver would not say. It is also told to the
+    // compositor, so a canvas the GPU cannot hold is refused where it is set.
+    int maxTextureSide_ = 0;
     std::vector<uint8_t> uploadScratch_;    // Rows flipped to GL order, reused per upload.
     GLuint checkerTexture_ = 0;     // The reference grid, generated once per context.
     uint64_t textureRevision_ = 0;  // Last compositor revision seen.

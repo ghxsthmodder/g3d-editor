@@ -272,6 +272,56 @@ void testLayerBudget() {
     check(big.memoryBytes() == heavy.pixels.size(), "a camada recusada não fica na pilha");
 }
 
+// The canvas is the texture the model samples, so the ceiling of the driver is a rule of the canvas
+// and the budget of pixels is another. They refuse apart, and each says which one refused.
+void testCanvasCeilings() {
+    const uint8_t background[3] = {0, 0, 0};
+    std::string error;
+    g3d::TextureComposition composition = makeComposition(64, background, error);
+
+    check(composition.deviceLimit() == 0, "sem GL ninguém conhece o limite da GPU");
+    composition.setDeviceLimit(2048);
+    check(!composition.setCanvas(4096, 4096, error), "a tela acima do limite da GPU é recusada");
+    const bool namesThePhone = error.find("2048") != std::string::npos;
+    check(namesThePhone, "a recusa cita o número que o telefone deu");
+    check(error.find("GPU") != std::string::npos, "a recusa diz de onde veio o limite");
+    check(composition.setCanvas(2048, 2048, error), "o lado exato do limite entra");
+
+    // 8192 x 4096 cabe em todo limite de lado e estoura o orçamento: as duas regras
+    // falham apartadas.
+    composition.setDeviceLimit(0);
+    check(!composition.setCanvas(8192, 4096, error), "o orçamento de pixels barra a tela grande");
+    check(error.find("MP") != std::string::npos, "a recusa do orçamento fala em megapixels");
+    check(error.find("por lado") == std::string::npos, "e não culpa o limite de lado");
+}
+
+void testMemoryAccounting() {
+    g3d::TextureStudio &studio = g3d::TextureStudio::instance();
+    std::string error;
+    studio.reset();
+    check(studio.memoryBytes() == 0, "um estúdio vazio não retém nada");
+    check(studio.setCanvas(64, 64, error), "a tela do estúdio entra");
+    const int layer = studio.addLayer(solid(8, 8, 200, 30, 30, 255, "quadrado.png"), error);
+    check(layer > 0, "uma camada entra");
+    check(studio.memoryBytes() == 8 * 8 * 4, "a pilha conta a camada");
+    g3d::Image picture;
+    check(studio.texture(picture), "a composição é pintada");
+    check(studio.memoryBytes() == 8u * 8 * 4 + 64u * 64 * 4,
+          "a imagem composta entra na conta, que é a que o painel mostra");
+    studio.reset();
+    check(studio.memoryBytes() == 0, "o reset esvazia a conta");
+
+    // A reset comes whenever another model is imported, and the ceiling of the device does not
+    // change with it.
+    studio.setDeviceLimit(1024);
+    check(studio.deviceLimit() == 1024, "o estúdio guarda o limite que a GPU deu");
+    studio.reset();
+    check(studio.deviceLimit() == 1024, "o reset não esquece o limite do telefone");
+    const bool refused = !studio.setCanvas(2048, 2048, error);
+    check(refused, "a tela acima do limite segue recusada depois do reset");
+    studio.setDeviceLimit(0);
+}
+
 // The panel of the phone parses the two strings below, so their shape is part of the contract
 // between the native stack and the Kotlin side and not a free-form debug print.
 void testStudioText() {
@@ -324,6 +374,8 @@ int main() {
     testOrderDuplicateRemove();
     testDeterminismAndPng();
     testLayerBudget();
+    testCanvasCeilings();
+    testMemoryAccounting();
     testStudioText();
     std::printf("%d checagens, %d falhas\n", checks, failures);
     return failures == 0 ? 0 : 1;

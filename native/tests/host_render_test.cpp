@@ -276,6 +276,20 @@ int main() {
     renderer.onSurfaceChanged(kSize, kSize);
     check(glGetError() == GL_NO_ERROR, "nenhum erro de GL apos a configuracao");
 
+    // The ceiling this driver gives is what the compositor refuses above, so the phone's own limit is
+    // read here instead of only being trusted to work on a device.
+    GLint maxSide = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSide);
+    check(maxSide > 0, "o driver diz o maior lado de textura: " + std::to_string(maxSide));
+    const int published = g3d::TextureStudio::instance().deviceLimit();
+    check(published == static_cast<int>(maxSide),
+          "o estúdio recebe o limite da GPU: " + std::to_string(published));
+    std::string canvasError;
+    const bool refused = !g3d::TextureStudio::instance().setCanvas(1024 * 1024, 1024 * 1024,
+                                                                  canvasError);
+    check(refused, "uma tela acima do limite do driver é recusada antes de alocar");
+    g3d::TextureStudio::instance().reset();
+
     renderer.draw();
     check(glGetError() == GL_NO_ERROR, "nenhum erro de GL durante o desenho");
     const std::vector<unsigned char> solid = readPixels();

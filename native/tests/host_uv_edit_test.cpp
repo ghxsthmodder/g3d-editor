@@ -412,6 +412,104 @@ int main() {
     check(appliedUvs, "a cena passa a ter UVs depois de aplicar a geracao");
     editor.cancel();
 
+    // --- undo and redo ---------------------------------------------------------------------
+    // The session the interface drives: a step is the layout before an operation, so what the user
+    // can take back is exactly what the operations did to the islands.
+    check(editor.begin(1, editorError), "reabrir a malha 1 para o desfazer: " + editorError);
+    check(!editor.undo(), "sessao recém-aberta nao tem nada a desfazer");
+    check(!editor.redo(), "sessao recém-aberta nao tem nada a refazer");
+    check(editor.history().find("desfazer=0") != std::string::npos,
+          "o status diz quantos passos existem: " + editor.history());
+
+    check(editor.select(0, false), "selecionar a ilha 1 para desfazer");
+    float boxRestored[4];
+    islandBoundsFromLayout(editor, snapshot, 0, boxRestored);
+    check(editor.translate(0.07f, -0.03f), "mover antes de desfazer");
+    float boxMoved[4];
+    islandBoundsFromLayout(editor, snapshot, 0, boxMoved);
+    check(std::fabs(boxMoved[0] - boxRestored[0]) > 1e-4f, "o moveu chegou na ilha");
+    check(editor.undo(), "desfazer o movimento");
+    islandBoundsFromLayout(editor, snapshot, 0, boxRestored);
+    check(std::fabs(boxRestored[0] - boxMoved[0]) > 1e-4f &&
+              std::fabs(boxRestored[2] - (boxMoved[2] - 0.07f)) < 1e-4f,
+          "desfazer devolve a ilha ao lugar de antes");
+    check(editor.redo(), "refazer o movimento desfeito");
+    float boxRedone[4];
+    islandBoundsFromLayout(editor, snapshot, 0, boxRedone);
+    check(std::fabs(boxRedone[0] - boxMoved[0]) < 1e-4f &&
+              std::fabs(boxRedone[3] - boxMoved[3]) < 1e-4f,
+          "refazer traz o mesmo layout de antes do desfazer");
+    check(editor.undo() && !editor.undo(), "desfazer uma vez sobra e a segunda nao tem mais passo");
+
+    // A drag is one step: five moves between the grab and the lift are taken back together.
+    const float dragStep = 0.01f;
+    islandBoundsFromLayout(editor, snapshot, 0, boxRestored);
+    const float beforeDragMinU = boxRestored[0];
+    editor.beginGesture();
+    for (int move = 0; move < 5; ++move) {
+        check(editor.translate(dragStep, 0.0f), "move do arrasto " + std::to_string(move));
+    }
+    editor.endGesture();
+    islandBoundsFromLayout(editor, snapshot, 0, boxMoved);
+    check(std::fabs(boxMoved[0] - (beforeDragMinU + 5.0f * dragStep)) < 1e-4f,
+          "os cinco moves somam um deslocamento so");
+    check(editor.undo(), "desfazer o arrasto inteiro");
+    islandBoundsFromLayout(editor, snapshot, 0, boxRedone);
+    check(std::fabs(boxRedone[0] - beforeDragMinU) < 1e-4f,
+          "um desfazer apaga o arrasto todo, nao o ultimo move");
+    check(editor.redo(), "refazer o arrasto");
+    islandBoundsFromLayout(editor, snapshot, 0, boxMoved);
+    check(std::fabs(boxMoved[0] - (beforeDragMinU + 5.0f * dragStep)) < 1e-4f,
+          "refazer repoe o arrasto inteiro");
+
+    // Repacking touches every island and is still one step.
+    check(editor.repack(2), "reempacotar para desfazer de um passo");
+    const uint32_t islandsBeforeUndo = static_cast<uint32_t>(snapshot.islandBounds.size() / 4);
+    check(editor.layout(snapshot) && islandsBeforeUndo > 0, "o reempacotamento mexeu no layout");
+    check(editor.undo(), "desfazer o reempacotamento");
+    check(editor.layout(snapshot), "o layout volta depois de desfazer o reempacotamento");
+
+    // Undo out of a fresh generation, back to the layout the session started with. The scene is
+    // never touched here, so the comparison is made on the session's own layout.
+    check(editor.begin(1, editorError), "reabrir a malha 1 para a geracao: " + editorError);
+    check(editor.layout(snapshot), "a sessao aberta entrega seu layout");
+    const std::vector<float> layoutBeforeGenerate = snapshot.uvs;
+    const std::vector<uint32_t> indicesBeforeGenerate = snapshot.indices;
+    check(editor.generate(1, generateOptions, editorError),
+          "gerar sobre uma sessao aberta: " + editorError);
+    check(editor.layout(snapshot) && snapshot.uvs != layoutBeforeGenerate,
+          "a geracao troca o layout da sessao");
+    check(editor.undo(), "desfazer a geracao");
+    check(editor.layout(snapshot) && snapshot.uvs == layoutBeforeGenerate &&
+              snapshot.indices == indicesBeforeGenerate,
+          "desfazer a geracao devolve o layout e a malha com que a sessao abriu");
+    check(editor.redo(), "refazer a geracao desfeita");
+    check(editor.layout(snapshot) && snapshot.uvs != layoutBeforeGenerate,
+          "refazer traz o layout gerado de volta");
+
+    // Applying ends the window: the scene owns the layout from there on.
+    check(editor.select(0, false) && editor.translate(0.02f, 0.0f), "editar antes de aplicar");
+    check(editor.apply(editorError), "aplicar com historia aberta: " + editorError);
+    check(!editor.undo(), "aplicar fecha o desfazer da previsualizacao");
+
+    // The history is capped, so an endless drag session cannot grow without bound.
+    check(editor.begin(1, editorError), "reabrir para o limite de historia: " + editorError);
+    check(editor.select(0, false), "selecionar para os passos em serie");
+    for (int step = 0; step < 70; ++step) {
+        editor.translate(0.001f, 0.0f);
+    }
+    int undoneSteps = 0;
+    while (editor.undo()) {
+        ++undoneSteps;
+    }
+    check(undoneSteps == 64, "a historia guarda no maximo 64 passos, guardou " +
+                                 std::to_string(undoneSteps));
+    check(editor.layout(snapshot), "o layout continua legivel depois de esvaziar a historia");
+    editor.cancel();
+    check(editor.begin(1, editorError), "reabrir depois de cancelar: " + editorError);
+    check(!editor.undo(), "cancelar limpa a historia");
+    editor.cancel();
+
     std::printf("\n%d verificacoes, %d falhas\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

@@ -61,6 +61,27 @@ public:
     // exactly; only their placement changes.
     bool repack(uint32_t paddingTexels);
 
+    // Undo and redo over the edits of this session. A step is the state the session held before an
+    // operation, kept whole, so a drag, a repack and a fresh xatlas run are undone the same way and
+    // the UVs a file brought back are reachable again after a generate.
+    bool canUndo() const { return !undo_.empty(); }
+    bool canRedo() const { return !redo_.empty(); }
+    bool undo();
+    bool redo();
+    // A gesture has to be one step: while it is open the first mutation records and the ones that
+    // follow it are absorbed into that same record.
+    void beginGesture();
+    void endGesture();
+    // Drops every record. Called when the session's edits stop being undoable because they left the
+    // preview and became the document, or because a new mesh was opened.
+    void clearHistory();
+    // Closes the current state into the undo stack. For the operations a session cannot see coming
+    // from inside itself, such as a generate that replaces the layout wholesale.
+    void pushUndoStep();
+    size_t undoSteps() const { return undo_.size(); }
+    size_t redoSteps() const { return redo_.size(); }
+    std::string historyDescribe() const;
+
     // The atlas the layout targets, in texels. Padding is expressed in texels, so the session
     // needs the size to turn it into UV units.
     void setAtlasSize(uint32_t width, uint32_t height);
@@ -71,9 +92,28 @@ public:
     std::string describe() const;
 
 private:
+    // Everything a step has to bring back: the layout as a whole, which islands were picked and
+    // the atlas the padding was measured against.
+    struct Step {
+        Mesh mesh;
+        std::vector<uint32_t> selected;
+        uint32_t atlasWidth = 1024;
+        uint32_t atlasHeight = 1024;
+    };
+
     bool requireSelection(const char *operation, std::string &error) const;
     void transformSelection(float angleRadians, float scale, float pivotU, float pivotV,
                             float du, float dv);
+    // The same moves without a record in front of them. An operation made of several moves, such as
+    // a repack, is one undo step, so it moves islands through these.
+    bool translatePlain(float du, float dv);
+    bool scalePlain(float factor, float pivotU, float pivotV);
+
+    Step capture() const;
+    void record();
+    void restore(const Step &step);
+    size_t stepBytes(const Step &step) const;
+    void trim(std::vector<Step> &stack) const;
 
     Mesh working_;
     std::vector<float> loadedUvs_;
@@ -81,6 +121,10 @@ private:
     std::vector<uint32_t> selected_;
     uint32_t atlasWidth_ = 1024;
     uint32_t atlasHeight_ = 1024;
+    std::vector<Step> undo_;
+    std::vector<Step> redo_;
+    bool inGesture_ = false;
+    bool gestureRecorded_ = false;
 };
 
 }  // namespace g3d

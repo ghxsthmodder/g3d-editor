@@ -35,6 +35,7 @@ bool UvEditor::begin(uint32_t meshIndex, std::string &error) {
         return false;
     }
     std::lock_guard<std::mutex> guard(mutex_);
+    session_.clearHistory();
     if (!session_.load(source, error)) {
         active_ = false;
         return false;
@@ -56,6 +57,11 @@ bool UvEditor::generate(uint32_t meshIndex, const UvOptions &options, std::strin
         return false;
     }
     std::lock_guard<std::mutex> guard(mutex_);
+    // A generation replaces the layout, so the state before it has to be in the history: opening a
+    // generate straight after begin() has nothing to go back to beyond the file's own UVs.
+    if (active_) {
+        session_.pushUndoStep();
+    }
     if (!session_.load(generated.mesh, error)) {
         active_ = false;
         return false;
@@ -86,6 +92,9 @@ bool UvEditor::apply(std::string &error) {
     std::lock_guard<std::mutex> guard(mutex_);
     session_.load(edited, error);
     error.clear();
+    // The scene holds this layout now. Undo reaching back into the preview would leave the two
+    // disagreeing about what the document is, so the window on the previous steps closes here.
+    session_.clearHistory();
     ++revision_;
     return true;
 }
@@ -93,6 +102,7 @@ bool UvEditor::apply(std::string &error) {
 void UvEditor::cancel() {
     std::lock_guard<std::mutex> guard(mutex_);
     session_.clear();
+    session_.clearHistory();
     active_ = false;
     ++revision_;
 }
@@ -162,6 +172,34 @@ bool UvEditor::fit() {
 
 bool UvEditor::repack(uint32_t paddingTexels) {
     return edit([paddingTexels](UvSession &session) { return session.repack(paddingTexels); });
+}
+
+bool UvEditor::undo() {
+    return edit([](UvSession &session) { return session.undo(); });
+}
+
+bool UvEditor::redo() {
+    return edit([](UvSession &session) { return session.redo(); });
+}
+
+void UvEditor::beginGesture() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    if (active_) {
+        session_.beginGesture();
+    }
+}
+
+void UvEditor::endGesture() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    session_.endGesture();
+}
+
+std::string UvEditor::history() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    if (!active_) {
+        return "nenhuma edicao de UV aberta";
+    }
+    return session_.historyDescribe();
 }
 
 bool UvEditor::isSelected(uint32_t island) {

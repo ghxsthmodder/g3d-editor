@@ -6,11 +6,18 @@
 #include <limits>
 #include <numeric>
 #include <unordered_set>
+#include <utility>
 
 namespace g3d {
 namespace {
 
 constexpr float kUvEpsilon = 1e-5f;
+
+// How far back an edit session reaches. The step is the whole layout, so the byte ceiling is what
+// a big mesh runs into first; the log reports both, and an edit that fell out of the window is
+// simply no longer undoable rather than silently half-restored.
+constexpr size_t kMaxHistorySteps = 64;
+constexpr size_t kMaxHistoryBytes = 24u * 1024u * 1024u;
 
 bool pointInTriangle(float px, float py, float ax, float ay, float bx, float by, float cx,
                      float cy) {
@@ -229,7 +236,7 @@ void refreshBounds(const Mesh &mesh, UvIslands &islands) {
 
 }  // namespace
 
-bool UvSession::translate(float du, float dv) {
+bool UvSession::translatePlain(float du, float dv) {
     std::string error;
     if (!requireSelection("mover", error)) {
         return false;
@@ -239,11 +246,31 @@ bool UvSession::translate(float du, float dv) {
     return true;
 }
 
+bool UvSession::scalePlain(float factor, float pivotU, float pivotV) {
+    std::string error;
+    if (!requireSelection("escalar", error) || factor <= 0.0f) {
+        return false;
+    }
+    transformSelection(0.0f, factor, pivotU, pivotV, 0.0f, 0.0f);
+    refreshBounds(working_, islands_);
+    return true;
+}
+
+bool UvSession::translate(float du, float dv) {
+    std::string error;
+    if (!requireSelection("mover", error)) {
+        return false;
+    }
+    record();
+    return translatePlain(du, dv);
+}
+
 bool UvSession::rotate(float angleRadians, float pivotU, float pivotV) {
     std::string error;
     if (!requireSelection("girar", error) || angleRadians == 0.0f) {
         return false;
     }
+    record();
     transformSelection(angleRadians, 1.0f, pivotU, pivotV, 0.0f, 0.0f);
     refreshBounds(working_, islands_);
     return true;
@@ -254,6 +281,7 @@ bool UvSession::scale(float factor, float pivotU, float pivotV) {
     if (!requireSelection("escalar", error) || factor <= 0.0f) {
         return false;
     }
+    record();
     transformSelection(0.0f, factor, pivotU, pivotV, 0.0f, 0.0f);
     refreshBounds(working_, islands_);
     return true;
@@ -289,11 +317,14 @@ bool UvSession::fitSelectionToAtlas() {
     if (!selectionBounds(box)) {
         return false;
     }
+    // Shrinking and nudging are two moves of one decision, so the record is taken here and the
+    // moves below go through the plain entry points.
+    record();
     const float width = box[2] - box[0];
     const float height = box[3] - box[1];
     if (width > 1.0f + kUvEpsilon || height > 1.0f + kUvEpsilon) {
         const float factor = 0.98f / std::max(width, height);
-        scale(factor, (box[0] + box[2]) * 0.5f, (box[1] + box[3]) * 0.5f);
+        scalePlain(factor, (box[0] + box[2]) * 0.5f, (box[1] + box[3]) * 0.5f);
         if (!selectionBounds(box)) {
             return false;
         }
@@ -302,7 +333,7 @@ bool UvSession::fitSelectionToAtlas() {
     const float du = box[0] < 0.0f ? -box[0] : (box[2] > 1.0f ? 1.0f - box[2] : 0.0f);
     const float dv = box[1] < 0.0f ? -box[1] : (box[3] > 1.0f ? 1.0f - box[3] : 0.0f);
     if (du != 0.0f || dv != 0.0f) {
-        translate(du, dv);
+        translatePlain(du, dv);
     }
     return true;
 }
@@ -379,21 +410,139 @@ bool UvSession::repack(uint32_t paddingTexels) {
     }
 
     const std::vector<uint32_t> previousSelection = selected_;
+    // Every island is placed with a scale and a move, but the repack as a whole is one step: the
+    // record is taken here and the per-island moves use the plain entry points.
+    record();
     for (const Slot &slot : slots) {
         const UvIsland *group = islands_.island(slot.island);
         selected_.assign(1, slot.island);
         if (layoutScale != 1.0f) {
-            scale(layoutScale, group->boundsMin[0], group->boundsMin[1]);
+            scalePlain(layoutScale, group->boundsMin[0], group->boundsMin[1]);
         }
         float box[4];
         if (!selectionBounds(box)) {
             continue;
         }
-        translate(slot.x - box[0], slot.y - box[1]);
+        translatePlain(slot.x - box[0], slot.y - box[1]);
     }
     selected_ = previousSelection;
     refreshBounds(working_, islands_);
     return true;
+}
+
+UvSession::Step UvSession::capture() const {
+    Step step;
+    step.mesh = working_;
+    step.selected = selected_;
+    step.atlasWidth = atlasWidth_;
+    step.atlasHeight = atlasHeight_;
+    return step;
+}
+
+size_t UvSession::stepBytes(const Step &step) const {
+    const Mesh &mesh = step.mesh;
+    return sizeof(Step) +
+           (mesh.positions.size() + mesh.normals.size() + mesh.uvs.size()) * sizeof(float) +
+           (mesh.indices.size() + step.selected.size()) * sizeof(uint32_t) + mesh.name.size();
+}
+
+void UvSession::trim(std::vector<Step> &stack) const {
+    size_t bytes = 0;
+    for (const Step &step : stack) {
+        bytes += stepBytes(step);
+    }
+    // The oldest step is always kept, even for a mesh so large that one step fills the window:
+    // undoing the last edit is worth more than an empty history, and dropping the newest would
+    // come to the same thing.
+    while (stack.size() > 1 && (stack.size() > kMaxHistorySteps || bytes > kMaxHistoryBytes)) {
+        bytes -= stepBytes(stack.front());
+        stack.erase(stack.begin());
+    }
+}
+
+void UvSession::record() {
+    if (!isLoaded()) {
+        return;
+    }
+    if (inGesture_ && gestureRecorded_) {
+        return;
+    }
+    undo_.push_back(capture());
+    trim(undo_);
+    redo_.clear();
+    gestureRecorded_ = inGesture_;
+}
+
+void UvSession::pushUndoStep() {
+    if (!isLoaded()) {
+        return;
+    }
+    undo_.push_back(capture());
+    trim(undo_);
+    redo_.clear();
+}
+
+void UvSession::beginGesture() {
+    inGesture_ = true;
+    gestureRecorded_ = false;
+}
+
+void UvSession::endGesture() {
+    inGesture_ = false;
+    gestureRecorded_ = false;
+}
+
+void UvSession::clearHistory() {
+    undo_.clear();
+    redo_.clear();
+    endGesture();
+}
+
+void UvSession::restore(const Step &step) {
+    working_ = step.mesh;
+    selected_ = step.selected;
+    atlasWidth_ = step.atlasWidth;
+    atlasHeight_ = step.atlasHeight;
+    std::string reason;
+    if (!computeIslands(working_, islands_, reason)) {
+        islands_.clear();
+    }
+}
+
+bool UvSession::undo() {
+    if (undo_.empty()) {
+        return false;
+    }
+    endGesture();
+    Step back = std::move(undo_.back());
+    undo_.pop_back();
+    redo_.push_back(capture());
+    trim(redo_);
+    restore(back);
+    return true;
+}
+
+bool UvSession::redo() {
+    if (redo_.empty()) {
+        return false;
+    }
+    endGesture();
+    Step forward = std::move(redo_.back());
+    redo_.pop_back();
+    undo_.push_back(capture());
+    trim(undo_);
+    restore(forward);
+    return true;
+}
+
+std::string UvSession::historyDescribe() const {
+    size_t bytes = 0;
+    for (const Step &step : undo_) {
+        bytes += stepBytes(step);
+    }
+    return "desfazer=" + std::to_string(undo_.size()) +
+           " refazer=" + std::to_string(redo_.size()) +
+           " historico=" + std::to_string(bytes / 1024) + "KB";
 }
 
 UvEditReport UvSession::validate() const {

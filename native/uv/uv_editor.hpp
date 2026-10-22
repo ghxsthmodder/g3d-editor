@@ -52,6 +52,17 @@ public:
     bool scale(float factor, float pivotU, float pivotV);
     bool fit();
     bool repack(uint32_t paddingTexels);
+
+    // Undo and redo of the edits above, for as long as the session is open. Applying hands the
+    // layout to the scene and closes the window on what came before it.
+    bool undo();
+    bool redo();
+    // A one-finger drag is a single step however many moves it is made of: the grab opens the
+    // gesture and the touch up closes it.
+    void beginGesture();
+    void endGesture();
+    // "desfazer=N refazer=M historico=KKB", for the status line.
+    std::string history();
     // Centre of the selection's UV box. A rotate or scale needs a pivot, and the interface has no
     // way to know where the selection is without it. False when nothing is selected.
     bool selectionPivot(float out[2]);

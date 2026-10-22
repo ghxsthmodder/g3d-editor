@@ -303,7 +303,7 @@ JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeUvCancel(JNIEnv *, jclas
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeUvStatus(JNIEnv *env, jclass) {
     g3d::UvEditor &editor = g3d::UvEditor::instance();
     std::ostringstream stream;
-    stream << editor.describe() << "\n" << editor.report();
+    stream << editor.describe() << "\n" << editor.report() << "\n" << editor.history();
     return toJString(env, stream.str());
 }
 
@@ -362,6 +362,16 @@ JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvRepack(JNIEnv *, j
                : JNI_FALSE;
 }
 
+// --- undo and redo ---------------------------------------------------------------------
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvUndo(JNIEnv *, jclass) {
+    return g3d::UvEditor::instance().undo() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvRedo(JNIEnv *, jclass) {
+    return g3d::UvEditor::instance().redo() ? JNI_TRUE : JNI_FALSE;
+}
+
 // --- vista e atlas ---------------------------------------------------------------------
 // The atlas rectangle is derived from the surface size, so these read state the GL thread owns,
 // but none of them issues a GL call: they are safe from the UI thread.
@@ -378,7 +388,18 @@ JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeSetSplitRatio(JNIEnv *, 
 JNIEXPORT jboolean JNICALL Java_com_g3d_editor_Native_nativeUvGrab(JNIEnv *, jclass, jfloat x,
                                                                    jfloat y,
                                                                    jboolean additive) {
-    return g3d::Renderer::instance().uvGrab(x, y, additive == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
+    g3d::Renderer &renderer = g3d::Renderer::instance();
+    const bool grabbed = renderer.uvGrab(x, y, additive == JNI_TRUE);
+    // The grab is the start of the drag: from here the moves belong to one undo step until the
+    // finger lifts and nativeUvEndGesture is called.
+    if (grabbed) {
+        g3d::UvEditor::instance().beginGesture();
+    }
+    return grabbed ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeUvEndGesture(JNIEnv *, jclass) {
+    g3d::UvEditor::instance().endGesture();
 }
 
 JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeUvDragPixels(JNIEnv *, jclass, jfloat dx,

@@ -83,8 +83,8 @@ licença e os arquivos mantidos.
 - Como entram: o traçado é copiado sem edição em `app/src/main/res/drawable/ic_*.xml`; o preenchimento
   preto veda em `@android:color/white` porque quem define a cor é o `iconTint` do botão. Nada de
   reamostragem, simplificação ou redesenho.
-- Tamanho adicionado: os 27 vetores somam ~14 KB em fonte; no APK eles entram no bloco de recursos
-  compilados, que não foi medido separadamente.
+- Tamanho adicionado: os 27 SVGs guardados somam 8,2 KB; os 27 drawables XML gerados a partir deles
+  somam 13,1 KB. No APK eles entram no bloco de recursos compilados, que não foi medido separadamente.
 
 ## meshoptimizer
 

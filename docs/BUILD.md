@@ -42,6 +42,29 @@ Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembl
 dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
 não é necessário.
 
+Medidas do último *build* de depuração: `app-debug.apk` de 17,0 MB, com `libg3dnative.so` despojado
+de 4,34 MB (arm64-v8a) e 4,20 MB (x86_64). É Debug com símbolos parciais, não Release: o número serve
+para acompanhar a tendência quando algo é incorporado, não como tamanho de distribuição. Os glifos
+vetoriais da interface são 27 arquivos XML que somam 13 KB de fonte; no APK eles entram no bloco de
+recursos compilados, que não é medido à parte aqui.
+
+## Conferir a ponte JNI
+
+Toda `external fun` de `app/src/main/java/com/g3d/editor/Native.kt` precisa de um símbolo
+`Java_com_g3d_editor_Native_*` exportado pela biblioteca nativa. Nenhum dos dois lados reclama de um
+encontro faltando — só dá `UnsatisfiedLinkError` no telefone, no momento em que a função é chamada.
+Depois de `assembleDebug`:
+
+```bash
+SO=app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/arm64-v8a/libg3dnative.so
+diff <(nm -D --defined-only "$SO" | grep -o 'Java_com_g3d_editor_Native_[a-zA-Z_]*' |
+      sed 's/.*_Native_//' | sort) \
+     <(grep -o 'external fun native[A-Za-z]*' app/src/main/java/com/g3d/editor/Native.kt |
+      sed 's/external fun //' | sort)
+```
+
+Sem saída, os dois lados batem. São 53 funções declaradas e 53 exportadas neste momento.
+
 ## Testar o núcleo nativo sem dispositivo
 
 ```bash
@@ -65,12 +88,13 @@ CTest (nenhum deles faz parte do APK):
 `libgles-dev`/Mesa). Ele usa a plataforma *surfaceless* do Mesa e, quando não há contexto
 disponível, imprime `SKIP` e sai com sucesso. Com `G3D_RENDER_PREVIEW=/tmp/look` ele também grava
 PPM para inspecionar a imagem sem telefone: `look.solido.ppm`, `look.normais.ppm`,
-`look.selecao.ppm`, `look.atlas.ppm` (sobreposições em vermelho), `look.ilha.ppm` (ilha selecionada
-em âmbar), `look.repack.ppm`, `look.so_atlas.ppm` e `look.vazio.ppm`. Da Fase 4 entram
-`look.textura.ppm` (modelo sombreado com a composição), `look.grade.ppm` (grade quadriculada de
-referência), `look.atlas_textura.ppm` (a composição desenhada no atlas), `look.atlas_sem_linhas.ppm`
-(atlas com as linhas de UV ocultadas) e `look.atlas_mudanca.ppm` (atlas depois de mover uma camada,
-provando que as duas vistas acompanham).
+`look.selecao.ppm`, `look.atlas.ppm` (sobreposições em vermelho), `look.atlas_dominante.ppm` (o
+atlas grande com a tira 3D estreita), `look.ilha.ppm` (ilha selecionada em âmbar),
+`look.arrastar_ilha.ppm` (a mesma ilha depois do arrasto), `look.repack.ppm`, `look.so_atlas.ppm` e
+`look.vazio.ppm`. Da Fase 4 entram `look.textura.ppm` (modelo sombreado com a composição),
+`look.grade.ppm` (grade quadriculada de referência), `look.atlas_textura.ppm` (a composição desenhada
+no atlas), `look.atlas_sem_linhas.ppm` (atlas com as linhas de UV ocultadas) e
+`look.atlas_mudanca.ppm` (atlas depois de mover uma camada, provando que as duas vistas acompanham).
 
 As fixtures de imagem usadas pelo `image_test` estão em `native/tests/models`: `gradient.jpg`
 (64×64, JPEG *baseline* — o stb recusa JPEG progressivo), `palette.png` (32×32 em paleta com um

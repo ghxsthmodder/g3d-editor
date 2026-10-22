@@ -487,7 +487,9 @@ Ao concluir cada fase, informar:
 
 Licenças e atribuições
 
-Antes de distribuir o aplicativo, verificar as licenças e obrigações de atribuição de cada versão das bibliotecas utilizadas, incluindo xatlas, Assimp, stb, GLM, Material Components e meshoptimizer.
+Antes de distribuir o aplicativo, verificar as licenças e obrigações de atribuição de cada versão das
+bibliotecas utilizadas, incluindo xatlas, Assimp, stb, GLM, Material Components, os glifos do Material
+Icons e meshoptimizer.
 
 Manter os avisos de licença exigidos e registrar as versões efetivamente incorporadas.
 

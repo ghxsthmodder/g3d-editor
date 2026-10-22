@@ -6,9 +6,12 @@ texturas por camadas. Veja o [PLAN.md](PLAN.md) para objetivos, escopo e fases.
 **Estado:** Fase 4 implementada — geração e edição de UVs com xatlas (Fase 3) e compositor de
 texturas: importação de PNG/JPEG, pilha de camadas com posição, rotação, escala, opacidade e
 visibilidade, cor de fundo, prévia da composição no modelo e no atlas, modo quadriculado de
-referência e exportação em PNG. O comportamento do núcleo é comprovado pelos sete testes do host
-(`bash native/tests/run_host_test.sh`), inclusive o renderizador headless; o painel do compositor
-ainda não foi validado em telefone. Salvamento de projeto, exportação de modelos e desfazer/refazer
+referência e exportação em PNG. A interface seguiu a proposta do protótipo: paleta de grafite, rail
+de glifos Material vendorizados no lugar das duas barras de texto, inspetor com as abas
+Cena | UV | Camadas, atlas dominante quando a edição é dele (3D fica com ~22% da tela) e arrastar
+com um dedo move as ilhas selecionadas. O comportamento do núcleo é comprovado pelos sete testes do
+host (`bash native/tests/run_host_test.sh`), inclusive o renderizador headless; o layout novo ainda
+não foi validado em telefone. Salvamento de projeto, exportação de modelos e desfazer/refazer
 (Fase 5) ainda não existem.
 
 ## Compilar

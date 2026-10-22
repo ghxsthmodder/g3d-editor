@@ -40,6 +40,7 @@ set(G3D_CORE_SOURCES
     texture/texture_studio.cpp
     ${G3D_STB_IMPL}
     importers/assimp_importer.cpp
+    exporters/model_exporter.cpp
     uv/uv_service.cpp
     uv/uv_edit.cpp
     uv/uv_editor.cpp
@@ -95,6 +96,12 @@ else()
     target_compile_definitions(host_uv_test
         PRIVATE G3D_TEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/models")
     add_test(NAME uv_islands_test COMMAND host_uv_test)
+
+    add_executable(host_export_test tests/host_export_test.cpp)
+    target_link_libraries(host_export_test PRIVATE g3dcore)
+    target_compile_definitions(host_export_test
+        PRIVATE G3D_TEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/models")
+    add_test(NAME export_test COMMAND host_export_test)
 
     add_executable(host_uv_edit_test tests/host_uv_edit_test.cpp)
     target_link_libraries(host_uv_edit_test PRIVATE g3dcore)

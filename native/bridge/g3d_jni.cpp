@@ -13,6 +13,7 @@
 #include "core/document.hpp"
 #include "core/primitives.hpp"
 #include "exporters/model_exporter.hpp"
+#include "importers/assimp_importer.hpp"
 #include "project/project_io.hpp"
 #include "renderer/g3d_renderer.hpp"
 #include "texture/g3d_image.hpp"
@@ -208,6 +209,13 @@ JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeMemoryInfo(JNIEnv *en
 
 JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeSelectMesh(JNIEnv *, jclass, jint index) {
     g3d::Document::instance().select(index);
+}
+
+// How much of this device the editor is willing to spend on one scene. The app measures what is
+// free before an import; the importer decides what that number means in vertices.
+JNIEXPORT void JNICALL Java_com_g3d_editor_Native_nativeSetImportBudget(JNIEnv *, jclass,
+                                                                        jlong bytes) {
+    g3d::setImportBudgetBytes(bytes > 0 ? static_cast<size_t>(bytes) : 0u);
 }
 
 // --- renderer -------------------------------------------------------------------------

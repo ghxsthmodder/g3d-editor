@@ -1,5 +1,6 @@
 package com.g3d.editor
 
+import android.app.ActivityManager
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
@@ -20,6 +21,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -327,6 +329,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
         appendLine(getString(R.string.phase_4_status))
         appendLine("nativo: ${Native.nativeBuildInfo()}")
+        reportInterruptedStage()
         // Last so that it is what the status line shows before anything has happened: the gestures
         // are the thing to know on a first run, and the line keeps them in the log afterwards.
         appendLine(getString(R.string.viewport_hint))
@@ -488,6 +491,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         beginWork(getString(R.string.status_uv_generating, padding, resolution))
         val startedAt = System.currentTimeMillis()
         Thread {
+            noteStage("gerando os UVs")
             val reply = Native.nativeUvGenerate(uvMesh, padding, resolution)
             val elapsed = System.currentTimeMillis() - startedAt
             runOnUiThread {
@@ -873,6 +877,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         Thread {
             val startedAt = System.currentTimeMillis()
             val message = try {
+                noteStage("compondo o PNG")
                 val png = Native.nativeTexturePng()
                 if (png == null || png.isEmpty()) {
                     getString(R.string.status_texture_export_empty)
@@ -927,6 +932,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         Thread {
             val startedAt = System.currentTimeMillis()
             val message = try {
+                noteStage("exportando o modelo")
                 val files = Native.nativeExportModel(exportBaseName(), format)
                 if (files == null || files.isEmpty()) {
                     throw IllegalStateException("o núcleo não devolveu nenhum arquivo")
@@ -979,6 +985,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         Thread {
             val startedAt = System.currentTimeMillis()
             val message = try {
+                noteStage("salvando o projeto")
                 val bytes = Native.nativeProjectBytes()
                 if (bytes == null || bytes.isEmpty()) {
                     // The core says why, in the same slot it puts the report in: nothing to write is
@@ -1008,6 +1015,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         beginWork(getString(R.string.status_project_opening, name))
         Thread {
             val startedAt = System.currentTimeMillis()
+            applyImportBudget()
             val outcome = try {
                 readContents(uri, MAX_PROJECT_BYTES)
             } catch (error: Throwable) {
@@ -1018,6 +1026,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             val message = when (outcome) {
                 is Failure -> outcome.message
                 is Contents -> {
+                    noteStage("abrindo " + name)
                     val reply = Native.nativeOpenProject(outcome.bytes, name)
                     if (reply.startsWith("ERROR:")) {
                         getString(
@@ -1129,6 +1138,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
         Thread {
             val startedAt = System.currentTimeMillis()
+            applyImportBudget()
             val outcome = try {
                 readContents(uri)
             } catch (error: Throwable) {
@@ -1143,6 +1153,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     if (outcome.bytes.isEmpty()) {
                         getString(R.string.status_file_empty)
                     } else {
+                        noteStage("importando " + name)
                         val reply = Native.nativeImportModel(outcome.bytes, name)
                         val elapsed = System.currentTimeMillis() - startedAt
                         if (reply.startsWith("ERROR:")) {
@@ -1279,6 +1290,27 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun megabytes(bytes: Long): String =
         String.format(Locale.getDefault(), "%.1f", bytes / (1024.0 * 1024.0))
 
+    /**
+     * Tells the importer how much of this device a scene may take, before a file is read. A glTF is
+     * a list of references, so a few hundred kilobytes of nodes can describe gigabytes of geometry,
+     * and the process that tries to hold them is killed rather than shown an error. Asking the
+     * activity manager each time is deliberate: the number moves while other apps sit in memory.
+     */
+    private fun applyImportBudget() {
+        if (!Native.isAvailable) return
+        val manager = getSystemService(ACTIVITY_SERVICE) as? ActivityManager ?: return
+        val info = ActivityManager.MemoryInfo()
+        try {
+            manager.getMemoryInfo(info)
+        } catch (_: Throwable) {
+            return
+        }
+        Native.nativeSetImportBudget(
+            if (info.lowMemory) IMPORT_BUDGET_MIN
+            else maxOf(IMPORT_BUDGET_MIN, info.availMem / IMPORT_BUDGET_DIVISOR)
+        )
+    }
+
     private fun highlightRows() {
         rows.forEachIndexed { position, row ->
             val chosen = position == selectedMesh
@@ -1344,8 +1376,36 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun finishWork(message: String) {
         busy = false
         importButton.isEnabled = true
+        noteStage(STAGE_CLEAN)
         message.lineSequence().forEach { appendLine(it) }
         renderLog()
+    }
+
+    /**
+     * The heavy step the app is inside of, kept in a file of one line. A phone that closes the
+     * editor on its own leaves the reason in a log nobody reads from the device, and "parou em
+     * importar doghouse.glb" is the one thing needed to look in the right place. A step that
+     * finished clears the line, so the message only ever appears after a session that did not.
+     */
+    private fun noteStage(stage: String) {
+        try {
+            openFileOutput(STAGE_FILE, MODE_PRIVATE).use { it.write(stage.toByteArray()) }
+        } catch (_: Throwable) {
+            // Nothing on screen depends on this file.
+        }
+    }
+
+    private fun reportInterruptedStage() {
+        val text = try {
+            File(filesDir, STAGE_FILE).readText()
+        } catch (_: Throwable) {
+            return
+        }
+        if (text.isEmpty() || text == STAGE_CLEAN) {
+            return
+        }
+        appendLine(getString(R.string.status_interrupted_stage, text))
+        noteStage(STAGE_CLEAN)
     }
 
     private fun report(message: String) {
@@ -1394,6 +1454,16 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         // A project is a model and its textures in one file, so it is capped above the model alone.
         const val PROJECT_EXTENSION = ".g3dp"
         const val MAX_PROJECT_BYTES = 192L * MEGABYTE
+
+        // Of the memory the device says it can spare, the editor takes one part in this many for a
+        // single scene. The rest is for the file itself, the compositor, the GPU and the apps that
+        // are already awake.
+        const val IMPORT_BUDGET_DIVISOR = 4L
+        const val IMPORT_BUDGET_MIN = 32L * MEGABYTE
+
+        // One line naming the heavy step in progress, and its absence. See noteStage.
+        const val STAGE_FILE = "last_stage.txt"
+        const val STAGE_CLEAN = "limpa"
 
         // "tela=256x256", the first line of the compositor summary.
         val CANVAS_PATTERN = Regex("tela=(\\d+)x(\\d+)")

@@ -34,6 +34,13 @@ object Native {
 
     external fun nativeSelectMesh(index: Int)
 
+    /**
+     * Ceiling, in bytes, for the geometry a single file is allowed to expand into. A glTF is a list
+     * of references, so a small file can describe gigabytes of meshes; the importer stops at this
+     * budget and reports what it left out. Pass 0 to keep the value already set.
+     */
+    external fun nativeSetImportBudget(bytes: Long)
+
     external fun nativeRenderInit(): Boolean
 
     external fun nativeRenderResize(width: Int, height: Int)

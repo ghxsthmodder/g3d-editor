@@ -1,6 +1,7 @@
 // Host harness for the importer: runs Assimp against the fixtures in tests/models and checks the
 // conversion into the internal representation. Built by the host CMake branch, not part of the APK.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -52,6 +53,57 @@ g3d::ImportResult importFile(const std::string &name, std::string &error) {
         result.scene.clear();
     }
     return result;
+}
+
+bool hasWarning(const g3d::ImportResult &result, const std::string &fragment) {
+    return std::any_of(result.warnings.begin(), result.warnings.end(),
+                       [&](const std::string &warning) {
+                           return warning.find(fragment) != std::string::npos;
+                       });
+}
+
+// Written on its own, so the check does not pass simply by agreeing with the importer's code: a
+// string the phone can turn into Java, meaning valid UTF-8 with no overlong form, no surrogate
+// written as bytes, no character above the basic plane and no control byte in it.
+bool isSafeForJava(const std::string &text) {
+    for (size_t i = 0; i < text.size(); ++i) {
+        const unsigned char byte = static_cast<unsigned char>(text[i]);
+        if (byte < 0x20u || byte == 0x7Fu) {
+            return false;
+        }
+        if (byte < 0x80u) {
+            continue;
+        }
+        size_t rest = 0;
+        unsigned char minimum = 0x80u;
+        unsigned char maximum = 0xBFu;
+        if (byte >= 0xC2u && byte <= 0xDFu) {
+            rest = 1;
+        } else if (byte == 0xE0u) {
+            rest = 2;
+            minimum = 0xA0u;
+        } else if (byte == 0xEDu) {
+            rest = 2;
+            maximum = 0x9Fu;
+        } else if (byte >= 0xE1u && byte <= 0xEFu) {
+            rest = 2;
+        } else {
+            return false;
+        }
+        for (size_t follow = 1; follow <= rest; ++follow) {
+            if (i + follow >= text.size()) {
+                return false;
+            }
+            const unsigned char next = static_cast<unsigned char>(text[i + follow]);
+            const unsigned char low = follow == 1 ? minimum : 0x80u;
+            const unsigned char high = follow == 1 ? maximum : 0xBFu;
+            if (next < low || next > high) {
+                return false;
+            }
+        }
+        i += rest;
+    }
+    return true;
 }
 
 }  // namespace
@@ -148,6 +200,67 @@ int main() {
               "buffer externo falha mesmo com caminho real no hint (" + hint + ")");
         check(!error.empty() && error.find("GLB") != std::string::npos,
               "erro explica como contornar: " + error);
+    }
+
+    // --- a file that points many nodes at one mesh --------------------------------------
+    // A glTF is a list of references, so the scene it describes can be far bigger than the file:
+    // this fixture sends 320 nodes at one 24-vertex cube, twenty of them landing exactly where
+    // another one already landed. Expanded naively that shape of file is what closed the editor
+    // on a phone, because the process is killed for the memory before any message can be shown.
+    error.clear();
+    g3d::ImportResult instanced = importFile("Instanced.gltf", error);
+    check(error.empty() && instanced.scene.meshCount() == 300,
+          "Instanced.gltf traz as 300 partes colocadas, vieram " +
+              std::to_string(instanced.scene.meshCount()) + ": " + error);
+    check(hasWarning(instanced, "foram unidas"),
+          "as copias exatas no mesmo lugar viram um aviso: " + instanced.describe());
+
+    const uint32_t instancedVertices = instanced.scene.meshAt(0)->vertexCount();
+    const uint32_t instancedTriangles = instanced.scene.meshAt(0)->triangleCount();
+    const size_t oneMesh = g3d::estimateMeshBytes(instancedVertices, instancedTriangles);
+
+    // The budget is what the app asks for, so the test asks and gives it back afterwards.
+    const size_t previousBudget = g3d::importBudgetBytes();
+    g3d::setImportBudgetBytes(oneMesh * 5);
+    error.clear();
+    g3d::ImportResult capped = importFile("Instanced.gltf", error);
+    check(error.empty() && capped.scene.meshCount() == 5,
+          "o orcamento para a cena em 5 malhas, parou em " +
+              std::to_string(capped.scene.meshCount()) + ": " + error);
+    check(hasWarning(capped, "ficaram de fora"), "quanto fica de fora e dito ao usuario");
+    check(capped.scene.meshAt(0)->triangleCount() == instancedTriangles,
+          "as malhas que entraram estao inteiras");
+
+    // One mesh heavier than the whole budget still arrives: assimp already paid for it, and an
+    // empty editor with a warning is worse than a heavy one the user can look at.
+    g3d::setImportBudgetBytes(oneMesh / 2);
+    error.clear();
+    g3d::ImportResult smallest = importFile("Instanced.gltf", error);
+    check(error.empty() && smallest.scene.meshCount() == 1,
+          "a primeira malha passa mesmo sem orcamento, vieram " +
+              std::to_string(smallest.scene.meshCount()));
+    g3d::setImportBudgetBytes(previousBudget);
+    check(g3d::importBudgetBytes() == previousBudget, "o orcamento volta ao que era");
+
+    // --- nomes que o telefone não mostraria -----------------------------------------------
+    // Handing a string over to the Java side is strict about its bytes, and a file that carries a
+    // name in some other encoding closes the app on the way to the screen. The importer cleans
+    // names as it reads them, so a model that arrived with a broken name still arrives.
+    error.clear();
+    g3d::ImportResult oddNames = importFile("odd-names.obj", error);
+    check(error.empty() && oddNames.scene.meshCount() == 3,
+          "odd-names.obj importa os tres objetos, vieram " +
+              std::to_string(oddNames.scene.meshCount()) + ": " + error);
+    if (oddNames.scene.meshCount() == 3) {
+        const std::string first = oddNames.scene.meshAt(0)->name;
+        const std::string second = oddNames.scene.meshAt(1)->name;
+        const std::string third = oddNames.scene.meshAt(2)->name;
+        check(first == "caf?", "o byte Latin-1 sozinho vira uma marca: " + first);
+        check(second == "écriture", "o nome que ja era UTF-8 passa como veio: " + second);
+        check(third == "?cadeira", "um caractere fora do alcance e uma marca so: " + third);
+        for (const std::string *name : {&first, &second, &third}) {
+            check(isSafeForJava(*name), "nome legivel no telefone: " + *name);
+        }
     }
 
     // --- garbage and empty input --------------------------------------------------------

@@ -101,3 +101,12 @@ licença MIT, já presente no repositório — nada novo foi baixado para isto.
   gravado com atlas de 4096 aberto num telefone que só segura 2048 abre do mesmo jeito, com um aviso
   dizendo que a tela salva não coube e qual é o limite do aparelho, e fica sem tela até o usuário
   escolher uma resolução que caiba. O arquivo não é reescrito por causa disto.
+- Um glTF é uma lista de referências, então o que ele descreve pode ser muito maior que o arquivo:
+  quatro megabytes de nós chegaram a expandir em 28,7 milhões de vértices e um gigabyte e meio de
+  memória, e o processo morria antes de qualquer mensagem. A importação junta as referências que
+  caem exatamente no mesmo lugar e para de acrescentar malhas quando a cena passaria do orçamento
+  que o aplicativo mediu no telefone (`nativeSetImportBudget`, um quarto do que o aparelho declara
+  livre, com piso de 32 MB), avisando quantas partes ficaram de fora. A primeira malha do arquivo
+  entra sempre: assimp já a pagou, e um editor vazio com um aviso é pior que um pesado. Um `.g3dp`
+  gravado com a cena limitada reabre limitada do mesmo jeito, e o arquivo não é reescrito por causa
+  disto.

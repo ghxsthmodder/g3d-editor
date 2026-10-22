@@ -171,4 +171,5 @@
     <!-- Os números vêm do núcleo em bytes; estas palavras são o que o painel mostra. -->
     <string name="memory_line">memória retida: %1$s MB (arquivo %2$s · malhas %3$s · camadas %4$s · edição %5$s)</string>
     <string name="memory_empty">memória retida: 0 MB</string>
+    <string name="status_interrupted_stage">a sessão anterior parou em: %1$s</string>
 </resources>

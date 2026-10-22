@@ -13,6 +13,9 @@ import android.widget.SeekBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import java.io.ByteArrayOutputStream
@@ -39,7 +42,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private var busy = false
     private var uvOpen = false
     private var uvMesh = -1
-    private var logVisible = true
+    private var logVisible = false
     private var selectedLayer = -1
 
     private lateinit var viewport: ModelView
@@ -50,6 +53,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var sceneSummary: TextView
     private lateinit var outputScroll: ScrollView
     private lateinit var outputText: TextView
+    private lateinit var statusLine: TextView
     private lateinit var importButton: MaterialButton
     private lateinit var frameButton: MaterialButton
     private lateinit var logButton: MaterialButton
@@ -92,7 +96,14 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        setSupportActionBar(findViewById(R.id.toolbar))
+        // The status bar is 24dp of height the editor never gets back, and this screen has no
+        // notifications to read: a swipe still brings it, and nothing here needs it.
+        WindowCompat.getInsetsController(window, window.decorView)
+            .apply {
+                hide(WindowInsetsCompat.Type.statusBars())
+                systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
 
         viewport = findViewById(R.id.viewport)
         inspectorPanel = findViewById(R.id.inspectorPanel)
@@ -102,6 +113,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         sceneSummary = findViewById(R.id.sceneSummary)
         outputScroll = findViewById(R.id.outputScroll)
         outputText = findViewById(R.id.output)
+        statusLine = findViewById(R.id.statusLine)
         importButton = findViewById(R.id.importModel)
         frameButton = findViewById(R.id.frameScene)
         logButton = findViewById(R.id.toggleLog)
@@ -278,6 +290,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
         appendLine(getString(R.string.phase_4_status))
         appendLine("nativo: ${Native.nativeBuildInfo()}")
+        // Last so that it is what the status line shows before anything has happened: the gestures
+        // are the thing to know on a first run, and the line keeps them in the log afterwards.
+        appendLine(getString(R.string.viewport_hint))
         renderLog()
         refreshHierarchy()
     }
@@ -1014,6 +1029,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun renderLog() {
         outputText.text = log.toString()
         outputScroll.post { outputScroll.fullScroll(View.FOCUS_DOWN) }
+        // The line over the canvas is the part of the log that is always in sight, so a progress
+        // message or an error is readable without opening the strip.
+        val last = log.toString().lineSequence().lastOrNull { it.isNotBlank() } ?: return
+        statusLine.text = last.removePrefix("[").substringAfter(']', last).trim()
     }
 
     private companion object {

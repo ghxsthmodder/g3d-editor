@@ -5,20 +5,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <com.google.android.material.appbar.AppBarLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/editor_panel">
-
-        <!-- No subtitle: the phase line duplicated what the log already said, for a whole strip of
-             height the model could have used. -->
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            app:title="@string/app_name"
-            app:titleTextColor="@color/editor_text" />
-    </com.google.android.material.appbar.AppBarLayout>
+    <!-- No title bar: the app is one screen, and the 56dp the toolbar spent showing its own name is
+     height the model and the atlas use. -->
 
     <!-- The viewport keeps whatever the rail and the inspector do not need: the model and its
          atlas are the point of the screen, so the chrome is a column and two chips. -->
@@ -113,17 +101,46 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
-            <TextView
-                android:id="@+id/viewportHint"
+            <!-- One line of status over the bottom edge of the canvas, with the whole log stacked
+                 above it for whoever asks. As rows of the screen they cost the model 60dp it never
+                 gets back, and the log is read now and then, not looked at all the time. -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom"
                 android:layout_margin="6dp"
                 android:background="@color/overlay_background"
-                android:padding="3dp"
-                android:text="@string/viewport_hint"
-                android:textColor="@color/editor_text_dim"
-                android:textSize="10sp" />
+                android:orientation="vertical">
+
+                <ScrollView
+                    android:id="@+id/outputScroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="72dp"
+                    android:scrollbars="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/output"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="4dp"
+                        android:textColor="@color/editor_text"
+                        android:textIsSelectable="true"
+                        android:textSize="11sp"
+                        android:typeface="monospace" />
+                </ScrollView>
+
+                <TextView
+                    android:id="@+id/statusLine"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:padding="3dp"
+                    android:text="@string/viewport_hint"
+                    android:textColor="@color/editor_text_dim"
+                    android:textSize="10sp" />
+            </LinearLayout>
 
             <!-- View and shading float over the canvas as chips: they say what the surface is
                  showing, so they belong on it rather than in a bar that costs the model pixels. -->
@@ -955,24 +972,7 @@
                     </LinearLayout>
                 </LinearLayout>
             </ScrollView>
-            </FrameLayout>
+        </FrameLayout>
         </LinearLayout>
     </LinearLayout>
-
-    <ScrollView
-        android:id="@+id/outputScroll"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:background="@color/editor_background">
-
-        <TextView
-            android:id="@+id/output"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="4dp"
-            android:textColor="@color/editor_text_dim"
-            android:textIsSelectable="true"
-            android:textSize="11sp"
-            android:typeface="monospace" />
-    </ScrollView>
 </LinearLayout>

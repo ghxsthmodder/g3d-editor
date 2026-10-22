@@ -167,4 +167,24 @@ object Native {
      * companion. Null when there is nothing to export.
      */
     external fun nativeExportModel(baseName: String, format: Int): Array<ExportedFile>?
+
+    /**
+     * The editor as it stands, in the bytes of one project file: the model that came the scene in
+     * with, the UVs it holds now and the layer stack painted on the canvas. Null when there is
+     * nothing to write, with the reason in [nativeProjectReport].
+     */
+    external fun nativeProjectBytes(): ByteArray?
+
+    /**
+     * What the last project write or read put in the file, or why it did not: sizes, and a line for
+     * everything the format could not carry.
+     */
+    external fun nativeProjectReport(): String
+
+    /**
+     * Reads a project back: the model is imported from the bytes inside the file, not from the path
+     * it was first picked at, and the UVs, the canvas and the layers come with it. "OK" and the
+     * report when it worked, "ERROR:" and the reason when it did not.
+     */
+    external fun nativeOpenProject(data: ByteArray, fileName: String): String
 }

@@ -8,16 +8,19 @@ texturas (Fase 4) — importação de PNG/JPEG, pilha de camadas com posição, 
 e visibilidade, cor de fundo, prévia da composição no modelo e no atlas, modo quadriculado de
 referência e exportação em PNG — seguem como estavam. O modelo agora sai em **OBJ, glTF e GLB**: a
 cena aberta, com os UVs que o editor acabou de criar, é exportada para uma pasta escolhida e o
-companheiro do par (`.mtl` / `.bin`) é gravado junto, com aviso do que o formato não guarda. A
-interface seguiu a proposta do protótipo: paleta de grafite, rail de glifos Material vendorizados no
-lugar das duas barras de texto, inspetor com as abas Cena | UV | Camadas, atlas dominante quando a
-edição é dele (3D fica com ~22% da tela) e arrastar com um dedo move as ilhas selecionadas. O
-comportamento do núcleo é comprovado pelos oito testes do host
+companheiro do par (`.mtl` / `.bin`) é gravado junto, com aviso do que o formato não guarda. O
+editor também **salva e reabre o projeto** em `.g3dp`: os bytes do modelo de onde a cena veio, os
+UVs de cada malha e a pilha de camadas com suas imagens, todos dentro de um arquivo só, sem depender
+do caminho em que o modelo foi encontrado — o formato está descrito em [docs/PROJECT.md](docs/PROJECT.md).
+O desfazer e o refazer cobrem a sessão de UV: um arrasto é um passo, e uma geração pode ser desfeita
+até o layout que veio do arquivo. A interface seguiu a proposta do protótipo: paleta de grafite, rail
+de glifos Material vendorizados no lugar das duas barras de texto, inspetor com as abas Cena | UV |
+Camadas, atlas dominante quando a edição é dele (3D fica com ~22% da tela) e arrastar com um dedo
+move as ilhas selecionadas. O comportamento do núcleo é comprovado pelos nove testes do host
 (`bash native/tests/run_host_test.sh`), inclusive o renderizador headless, a ida e volta dos três
-formatos e o desfazer/refazer da sessão de UV — um arrasto é um passo, e uma geração pode ser desfeita
-até o layout que veio do arquivo. O layout novo e a gravação no SAF ainda não foram validados em
-telefone. Salvamento de projeto (Fase 5) ainda não existe; o desfazer hoje cobre a edição de UV
-aberta, não o documento inteiro.
+formatos de modelo, o desfazer/refazer e a reabertura de um projeto salvo. O layout novo, o
+salvamento e a leitura via SAF ainda não foram validados em telefone, e o desfazer hoje cobre a
+sessão de UV aberta, não o documento inteiro.
 
 ## Compilar
 

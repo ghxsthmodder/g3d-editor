@@ -194,6 +194,11 @@ void UvEditor::endGesture() {
     session_.endGesture();
 }
 
+bool UvEditor::hasHistory() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return active_ && (session_.canUndo() || session_.canRedo());
+}
+
 std::string UvEditor::history() {
     std::lock_guard<std::mutex> guard(mutex_);
     if (!active_) {

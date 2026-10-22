@@ -41,6 +41,8 @@ set(G3D_CORE_SOURCES
     ${G3D_STB_IMPL}
     importers/assimp_importer.cpp
     exporters/model_exporter.cpp
+    project/project_container.cpp
+    project/project_io.cpp
     uv/uv_service.cpp
     uv/uv_edit.cpp
     uv/uv_editor.cpp
@@ -50,6 +52,7 @@ set(G3D_CORE_SOURCES
 set(G3D_INCLUDES
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${G3D_THIRD_PARTY}
+    ${G3D_THIRD_PARTY}/assimp/contrib/rapidjson/include
     ${G3D_THIRD_PARTY}/assimp/include
     ${G3D_THIRD_PARTY}/glm
     ${G3D_THIRD_PARTY}/xatlas
@@ -118,6 +121,12 @@ else()
     add_executable(host_compose_test tests/host_compose_test.cpp)
     target_link_libraries(host_compose_test PRIVATE g3dcore)
     add_test(NAME compose_test COMMAND host_compose_test)
+
+    add_executable(host_project_test tests/host_project_test.cpp)
+    target_link_libraries(host_project_test PRIVATE g3dcore)
+    target_compile_definitions(host_project_test
+        PRIVATE G3D_TEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/models")
+    add_test(NAME project_test COMMAND host_project_test)
 
     # Headless GL test of the renderer. Only built when the host has EGL and OpenGL ES 3.
     find_library(G3D_EGL_LIBRARY EGL)

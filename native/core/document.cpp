@@ -37,7 +37,20 @@ bool Document::importModel(const void *data, size_t length, const std::string &h
     std::lock_guard<std::mutex> guard(mutex_);
     scene_ = std::move(result.scene);
     lastReport_ = std::move(report);
+    const uint8_t *bytes = static_cast<const uint8_t *>(data);
+    source_.assign(bytes, bytes + length);
+    sourceName_ = hint;
     return true;
+}
+
+bool Document::hasSource() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return !source_.empty();
+}
+
+std::string Document::sourceName() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return sourceName_;
 }
 
 std::string Document::describe() {

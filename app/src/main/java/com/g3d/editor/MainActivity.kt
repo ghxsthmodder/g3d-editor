@@ -107,6 +107,19 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             else report(getString(R.string.status_model_export_cancelled))
         }
 
+    // A project is one file, so it gets the save-as picker rather than the folder the model export
+    // needs: nothing inside it references another file by name.
+    private val saveProjectTo =
+        registerForActivityResult(ActivityResultContracts.CreateDocument(MIME_MODEL_FILE)) { uri: Uri? ->
+            if (uri != null) writeProject(uri)
+            else report(getString(R.string.status_project_save_cancelled))
+        }
+
+    private val openProjectFrom =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+            if (uri != null) readProject(uri)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -158,6 +171,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         findViewById<View>(R.id.exportObj).setOnClickListener { startModelExport(FORMAT_OBJ) }
         findViewById<View>(R.id.exportGltf).setOnClickListener { startModelExport(FORMAT_GLTF) }
         findViewById<View>(R.id.exportGlb).setOnClickListener { startModelExport(FORMAT_GLB) }
+        findViewById<View>(R.id.projectSave).setOnClickListener { startProjectSave() }
+        findViewById<View>(R.id.projectOpen).setOnClickListener { pickProject() }
         findViewById<View>(R.id.closeInspector).setOnClickListener { hideInspector() }
         inspectorTabs.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
@@ -910,6 +925,113 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun exportBaseName(): String =
         modelName.replace(Regex("[^A-Za-z0-9 ._-]"), "_").ifBlank { "modelo" }
 
+    // --- project file ----------------------------------------------------------------------
+
+    private fun pickProject() {
+        if (busy || !Native.isAvailable) return
+        // Any file the picker offers: what decides whether it is a project is the G3DP header, and a
+        // provider that labels the file differently must not hide one that is perfectly good.
+        openProjectFrom.launch(arrayOf("*/*"))
+    }
+
+    private fun startProjectSave() {
+        if (busy || !Native.isAvailable) return
+        if (rows.isEmpty()) {
+            report(getString(R.string.status_project_empty))
+            return
+        }
+        saveProjectTo.launch(exportBaseName() + PROJECT_EXTENSION)
+    }
+
+    private fun writeProject(uri: Uri) {
+        if (busy) return
+        beginWork(getString(R.string.status_project_saving))
+        Thread {
+            val startedAt = System.currentTimeMillis()
+            val message = try {
+                val bytes = Native.nativeProjectBytes()
+                if (bytes == null || bytes.isEmpty()) {
+                    // The core says why, in the same slot it puts the report in: nothing to write is
+                    // a fact about the document, not an I/O failure.
+                    getString(R.string.status_project_save_failed, Native.nativeProjectReport())
+                } else {
+                    val stream = contentResolver.openOutputStream(uri)
+                        ?: throw IllegalStateException(
+                            getString(R.string.status_read_error, "fluxo indisponível"))
+                    stream.use { it.write(bytes) }
+                    getString(
+                        R.string.status_project_saved,
+                        uri.lastPathSegment ?: ("projeto" + PROJECT_EXTENSION),
+                        "${bytes.size / 1024} KB em ${System.currentTimeMillis() - startedAt} ms"
+                    ) + "\n" + Native.nativeProjectReport()
+                }
+            } catch (error: Throwable) {
+                getString(R.string.status_project_save_failed, error.message ?: "?")
+            }
+            runOnUiThread { finishWork(message) }
+        }.start()
+    }
+
+    private fun readProject(uri: Uri) {
+        if (busy) return
+        val name = displayName(uri)
+        beginWork(getString(R.string.status_project_opening, name))
+        Thread {
+            val startedAt = System.currentTimeMillis()
+            val outcome = try {
+                readContents(uri, MAX_PROJECT_BYTES)
+            } catch (error: Throwable) {
+                Failure(getString(R.string.status_read_error, error.message ?: "?"))
+            }
+
+            var opened = false
+            val message = when (outcome) {
+                is Failure -> outcome.message
+                is Contents -> {
+                    val reply = Native.nativeOpenProject(outcome.bytes, name)
+                    if (reply.startsWith("ERROR:")) {
+                        getString(
+                            R.string.status_project_failed,
+                            reply.removePrefix("ERROR:").trim()
+                        )
+                    } else {
+                        opened = true
+                        getString(
+                            R.string.status_project_opened,
+                            name,
+                            "${System.currentTimeMillis() - startedAt} ms"
+                        ) + "\n" + reply.removePrefix("OK").trim()
+                    }
+                }
+            }
+
+            runOnUiThread {
+                if (opened) {
+                    // The session that was open pointed at the previous document, and applying it
+                    // now would write those UVs into a mesh that is not the one it read.
+                    if (uvOpen) {
+                        Native.nativeUvCancel()
+                        closeUvEditor()
+                    }
+                    modelName = name.substringBeforeLast('.', name)
+                    selectedMesh = -1
+                    viewport.refreshScene()
+                    viewport.frameScene()
+                    refreshHierarchy()
+                    refreshTextureStack()
+                    syncTextureCanvasField()
+                }
+                finishWork(message)
+            }
+        }.start()
+    }
+
+    /** The canvas the project carried is the one the field has to offer, or the panel disagrees. */
+    private fun syncTextureCanvasField() {
+        val match = CANVAS_PATTERN.find(Native.nativeTextureInfo()) ?: return
+        textureCanvasField.setText(match.groupValues[1])
+    }
+
     /**
      * Writes one file into the chosen folder, overwriting the one that is already there under that
      * name: the description references its companion by name, so a second copy with a suffix would
@@ -1201,11 +1323,19 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         // Providers are free to rewrite a name for a mime type they recognise; octet-stream keeps
         // the extension the exporter chose, which is the name the companion is referenced by.
         const val MIME_MODEL_FILE = "application/octet-stream"
+
         val SUPPORTED_IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg")
         val OPACITY_PATTERN = Regex("op=(\\d+)%")
         const val MEGABYTE = 1024L * 1024L
         const val MAX_MODEL_BYTES = 96L * MEGABYTE
         const val MAX_IMAGE_BYTES = 32L * MEGABYTE
+
+        // A project is a model and its textures in one file, so it is capped above the model alone.
+        const val PROJECT_EXTENSION = ".g3dp"
+        const val MAX_PROJECT_BYTES = 192L * MEGABYTE
+
+        // "tela=256x256", the first line of the compositor summary.
+        val CANVAS_PATTERN = Regex("tela=(\\d+)x(\\d+)")
         const val MIN_TEXTURE_SIDE = 16
         const val MAX_TEXTURE_SIDE = 8192
 

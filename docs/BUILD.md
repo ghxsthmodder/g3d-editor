@@ -42,8 +42,9 @@ Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembl
 dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
 não é necessário.
 
-Medidas do último *build* de depuração: `app-debug.apk` de 17,2 MB, com `libg3dnative.so` despojado
-de 4,43 MB (arm64-v8a) e 4,31 MB (x86_64). É Debug com símbolos parciais, não Release: o número serve
+Medidas do último *build* de depuração: `app-debug.apk` de 17,6 MB, com `libg3dnative.so` despojado
+de 5,10 MB (arm64-v8a) e 4,95 MB (x86_64). O módulo de projeto traz o RapidJSON que já vinha com o
+Assimp (cabeçalhos, instanciados onde o projeto é escrito e lido), e é dele boa parte desse aumento. É Debug com símbolos parciais, não Release: o número serve
 para acompanhar a tendência quando algo é incorporado, não como tamanho de distribuição. Os exportadores
 de OBJ e glTF do Assimp, ligados nesta contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais
 da interface são 29 arquivos XML que somam 13,9 KB de fonte; no APK eles entram no bloco de recursos
@@ -64,7 +65,7 @@ diff <(nm -D --defined-only "$SO" | grep -o 'Java_com_g3d_editor_Native_[a-zA-Z_
       sed 's/external fun //' | sort)
 ```
 
-Sem saída, os dois lados batem. São 58 funções declaradas e 58 exportadas neste momento.
+Sem saída, os dois lados batem. São 61 funções declaradas e 61 exportadas neste momento.
 
 ## Testar o núcleo nativo sem dispositivo
 
@@ -72,7 +73,7 @@ Sem saída, os dois lados batem. São 58 funções declaradas e 58 exportadas ne
 bash native/tests/run_host_test.sh
 ```
 
-O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os oito testes via
+O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os nove testes via
 CTest (nenhum deles faz parte do APK):
 
 | Teste | Executável | O que verifica |
@@ -83,6 +84,7 @@ CTest (nenhum deles faz parte do APK):
 | `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, validar, aplicar/cancelar e o desfazer/refazer, inclusive o arrasto inteiro num passo |
 | `export_test` | `host_export_test` | exportação OBJ/glTF/GLB em memória, ida e volta relida pelo importador: posição, UV e normal por canto, os pares `.gltf`+`.bin` e os avisos de perda |
 | `compose_test` | `host_compose_test` | pilha de camadas: fundo, mover, girar, escalar, opacidade, visibilidade, ordem, duplicar, remover, orçamento de memória e o PNG resultante |
+| `project_test` | `host_project_test` | container `.g3dp`: escrita e leitura, cabeçalho cortado, mágica errada, versão futura, bloco desalinhado, arquivo truncado, e a ida e volta do editor inteiro — UVs aplicados byte a byte, tela, fundo, ordem, posição, giro, escala, opacidade e visibilidade das camadas |
 | `image_test` | `host_image_test` | decodificação PNG/JPEG (stb), ida e volta sem perdas do PNG, paleta com transparência, limite de pixels e quadriculado de referência |
 | `render_test` | `host_render_test` | renderizador GLES 3 real, desenhado headless em um pbuffer: vista 3D, vista 2D do atlas e a textura composta aplicada nos dois modos |
 
@@ -108,4 +110,5 @@ serve para provar que o orçamento de pixels recusa a imagem antes de alocá-la.
 - `app/` — interface Android (Kotlin, Views + Material, orientação paisagem, tema escuro).
 - `native/` — núcleo C++, JNI (`native/bridge`) e `CMakeLists.txt` usado pelo AGP.
 - `native/tests/` — harness de teste no host.
+- `native/project/` — o formato `.g3dp`: container e leitura/escrita do documento (ver `docs/PROJECT.md`).
 - `third_party/` — bibliotecas incorporadas no repositório (ver `third_party/README.md`).

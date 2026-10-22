@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "core/scene.hpp"
 
@@ -39,12 +40,28 @@ public:
     // Report of the last import: format, materials, textures, warnings.
     std::string lastImportReport();
 
+    // The file the model came in with, kept whole. A project embeds these bytes, not the path
+    // they were read from: the picker's address is good until the user moves or deletes the file,
+    // and a project that cannot find its model is not editable any more.
+    bool hasSource() const;
+    std::string sourceName() const;
+
+    // Calls fn(const uint8_t *, size_t) with the document locked, for writing those bytes straight
+    // into a project: a model of ninety megabytes must not be copied again on the way to the file.
+    template <typename Fn>
+    void withSource(Fn fn) const {
+        std::lock_guard<std::mutex> guard(mutex_);
+        fn(source_.data(), source_.size());
+    }
+
 private:
     Document();
 
     Scene scene_;
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     std::string lastReport_;
+    std::vector<uint8_t> source_;
+    std::string sourceName_;
 };
 
 }  // namespace g3d

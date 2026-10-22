@@ -40,6 +40,9 @@ public:
     // Adds a layer with the image already decoded by the caller. The layer starts centred on the
     // canvas, at its own pixel size. Returns the new id, or -1 with error set.
     int addLayer(const Image &image, std::string &error);
+    // The same layer, but placed as a saved project had it: a restored stack has to come back where
+    // it was, not centred. Only the placement is read from `at`; the picture is the one given.
+    int addLayerAt(const Image &image, const TextureLayer &at, std::string &error);
     bool removeLayer(int id);
     bool duplicateLayer(int id, int &newId, std::string &error);
 

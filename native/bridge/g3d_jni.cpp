@@ -12,6 +12,7 @@
 #include "core/document.hpp"
 #include "core/primitives.hpp"
 #include "exporters/model_exporter.hpp"
+#include "project/project_io.hpp"
 #include "renderer/g3d_renderer.hpp"
 #include "texture/g3d_image.hpp"
 #include "texture/texture_studio.hpp"
@@ -661,6 +662,53 @@ Java_com_g3d_editor_Native_nativeExportModel(JNIEnv *env, jclass, jstring baseNa
         env->DeleteLocalRef(file);
     }
     return files;
+}
+
+// --- project file --------------------------------------------------------------------
+
+/**
+ * The editor as it stands, in the bytes of one .g3dp file, for Kotlin to hand to the storage
+ * framework wherever the picker allows. Null when there is nothing to write; what went in, or why
+ * nothing did, comes from nativeProjectReport().
+ */
+JNIEXPORT jbyteArray JNICALL Java_com_g3d_editor_Native_nativeProjectBytes(JNIEnv *env, jclass) {
+    std::vector<uint8_t> file;
+    g3d::ProjectReport report;
+    std::string error;
+    if (!g3d::saveProject(file, report, error)) {
+        __android_log_print(ANDROID_LOG_ERROR, kTag, "save project: %s", error.c_str());
+        return nullptr;
+    }
+    return toByteArray(env, file);
+}
+
+JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeProjectReport(JNIEnv *env, jclass) {
+    return toJString(env, g3d::projectReport());
+}
+
+JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeOpenProject(JNIEnv *env, jclass,
+                                                                        jbyteArray data,
+                                                                        jstring fileName) {
+    if (data == nullptr) {
+        return toJString(env, "ERROR: arquivo vazio");
+    }
+    const std::string name = readString(env, fileName);
+    const jsize length = env->GetArrayLength(data);
+    std::vector<jbyte> buffer(static_cast<size_t>(length > 0 ? length : 0));
+    if (!buffer.empty()) {
+        env->GetByteArrayRegion(data, 0, length, buffer.data());
+    }
+
+    g3d::ProjectReport report;
+    std::string error;
+    const bool opened = g3d::openProject(buffer.data(), static_cast<size_t>(length), name, report,
+                                         error);
+    const std::string text = g3d::projectReport();
+    __android_log_print(ANDROID_LOG_INFO, kTag, "open project %s: %s", name.c_str(), text.c_str());
+    if (!opened) {
+        return toJString(env, "ERROR: " + error);
+    }
+    return toJString(env, "OK\n" + text);
 }
 
 }  // extern "C"

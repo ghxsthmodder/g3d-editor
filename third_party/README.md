@@ -68,6 +68,19 @@ licença e os arquivos mantidos.
 - Uso atual: `native/importers/assimp_importer.cpp` (transformações de nó e normais) e
   `native/renderer/g3d_renderer.cpp` (câmera, matrizes de projeção e picking por raio).
 
+## RapidJSON (dentro do Assimp)
+
+- Finalidade: ler e escrever a descrição JSON do arquivo de projeto `.g3dp`.
+- Repositório: https://github.com/Tencent/rapidjson — não foi baixado à parte; é a cópia que vem em
+  `third_party/assimp/contrib/rapidjson`, que o próprio Assimp usa no importador de glTF.
+- Licença: MIT (`third_party/assimp/contrib/rapidjson/license.txt`, com a nota da Tencent). Está
+  também sob a declaração ISC do Assimp, que cobre os componentes de `contrib/`.
+- Arquivos usados: só os cabeçalhos de `include/rapidjson` (`document.h`, `stringbuffer.h`,
+  `writer.h`). Nada é compilado à parte — RapidJSON é header-only.
+- Como entra: `native/CMakeLists.txt` adiciona `contrib/rapidjson/include` a `G3D_INCLUDES`, e
+  `native/project/project_io.cpp` é a única unidade nossa que o usa. Nenhum código do Assimp é
+  chamado para isto; a cópia é apenas o cabeçalho já versionado aqui.
+
 ## Material Components for Android
 
 - Dependency Maven, não código em `third_party`: `com.google.android.material:material:1.12.0`

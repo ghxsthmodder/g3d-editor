@@ -63,6 +63,9 @@ public:
     void endGesture();
     // "desfazer=N refazer=M historico=KKB", for the status line.
     std::string history();
+    // Whether the open session has steps the undo and redo buttons would walk. Saving a project
+    // writes the scene, so the history behind an open session does not travel with the file.
+    bool hasHistory();
     // Centre of the selection's UV box. A rotate or scale needs a pivot, and the interface has no
     // way to know where the selection is without it. False when nothing is selected.
     bool selectionPivot(float out[2]);

@@ -36,6 +36,18 @@
     <string name="status_model_export_pair">%1$s é chamado dentro de %2$s: mantenha os dois na mesma pasta</string>
     <string name="status_model_export_warnings">o %1$s não guarda: %2$s</string>
 
+    <string name="project_title">Projeto editável</string>
+    <string name="project_open">Abrir</string>
+    <string name="project_save">Salvar</string>
+    <string name="status_project_saving">gravando o projeto …</string>
+    <string name="status_project_opening">abrindo o projeto %1$s …</string>
+    <string name="status_project_saved">%1$s salvo (%2$s)</string>
+    <string name="status_project_opened">%1$s aberto (%2$s)</string>
+    <string name="status_project_failed">o projeto não abriu: %1$s</string>
+    <string name="status_project_save_failed">o projeto não foi gravado: %1$s</string>
+    <string name="status_project_save_cancelled">salvamento cancelado</string>
+    <string name="status_project_empty">nada para salvar: não há modelo aberto</string>
+
     <string name="uv_title">Editor UV</string>
     <string name="uv_generate_title">Geração</string>
     <string name="uv_padding_hint">margem</string>

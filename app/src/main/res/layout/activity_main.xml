@@ -360,6 +360,37 @@
                         android:layout_weight="1"
                         android:text="@string/export_glb" />
                 </LinearLayout>
+
+                <!-- The project is not an export: it is the editor itself kept in one file, so it
+                     gets its own pair of named buttons next to the formats it is easy to confuse
+                     with. -->
+                <TextView
+                    style="@style/Widget.G3D.SectionLabel"
+                    android:paddingTop="6dp"
+                    android:text="@string/project_title" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/projectOpen"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/project_open" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/projectSave"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/project_save" />
+                </LinearLayout>
             </LinearLayout>
 
             <LinearLayout

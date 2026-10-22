@@ -135,6 +135,25 @@ bool TextureComposition::removeLayer(int id) {
     return false;
 }
 
+int TextureComposition::addLayerAt(const Image &image, const TextureLayer &at,
+                                   std::string &error) {
+    const int id = addLayer(image, error);
+    if (id < 0) {
+        return -1;
+    }
+    // addLayer may move the whole vector, so the placement is written through a fresh find.
+    TextureLayer *layer = find(id);
+    layer->name = at.name.empty() ? layer->name : at.name;
+    layer->centreX = at.centreX;
+    layer->centreY = at.centreY;
+    layer->rotationDegrees = at.rotationDegrees;
+    layer->scaleX = at.scaleX;
+    layer->scaleY = at.scaleY;
+    layer->opacity = at.opacity;
+    layer->visible = at.visible;
+    return id;
+}
+
 bool TextureComposition::duplicateLayer(int id, int &newId, std::string &error) {
     const TextureLayer *source = find(id);
     if (source == nullptr) {

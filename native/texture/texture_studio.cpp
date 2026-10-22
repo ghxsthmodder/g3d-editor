@@ -54,6 +54,20 @@ int TextureStudio::addLayer(const Image &image, std::string &error) {
     return id;
 }
 
+int TextureStudio::addLayerAt(const Image &image, const TextureLayer &at, std::string &error) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    const int id = composition_.addLayerAt(image, at, error);
+    if (id > 0) {
+        touch();
+    }
+    return id;
+}
+
+std::vector<TextureLayer> TextureStudio::layers() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return composition_.layers();
+}
+
 bool TextureStudio::removeLayer(int id) {
     std::lock_guard<std::mutex> guard(mutex_);
     if (!composition_.removeLayer(id)) {

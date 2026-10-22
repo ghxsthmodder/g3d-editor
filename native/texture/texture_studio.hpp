@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "texture/texture_layer.hpp"
 
@@ -25,6 +26,11 @@ public:
     void background(uint8_t out[3]) const;
 
     int addLayer(const Image &image, std::string &error);
+    // Puts a saved layer back where the project had it. The ids are reassigned: a reopened stack is
+    // numbered by this session, not by the one that wrote the file.
+    int addLayerAt(const Image &image, const TextureLayer &at, std::string &error);
+    // The stack as it stands, copies all the way down, for writing a project out.
+    std::vector<TextureLayer> layers() const;
     bool removeLayer(int id);
     bool duplicateLayer(int id, int &newId, std::string &error);
     bool moveUp(int id);

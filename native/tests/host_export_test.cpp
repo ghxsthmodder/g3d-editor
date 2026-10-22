@@ -415,6 +415,14 @@ int main() {
             }
         }
         check(mentionsTexture, "um aviso fala da textura composta");
+
+        // The interface shows the list before the folder is picked, so it has to be the same list
+        // the export itself ends up reporting.
+        const std::vector<std::string> preflight =
+            g3d::exportWarnings(cube.scene, g3d::ModelFormat::Glb);
+        check(preflight == glbExport.warnings,
+              "os avisos previos sao os da exportacao (" + std::to_string(preflight.size()) +
+                  " vs " + std::to_string(glbExport.warnings.size()) + ")");
     }
 
     // --- several meshes stay several meshes --------------------------------------------------

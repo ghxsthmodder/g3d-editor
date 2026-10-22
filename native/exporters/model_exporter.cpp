@@ -190,6 +190,43 @@ std::string ModelExport::describe() const {
     return text;
 }
 
+std::vector<std::string> exportWarnings(const Scene &scene, ModelFormat format) {
+    std::vector<std::string> warnings;
+    if (scene.isEmpty()) {
+        addWarningOnce(warnings, "não há malhas abertas para exportar");
+        return warnings;
+    }
+
+    bool missingUvs = false;
+    for (uint32_t i = 0; i < scene.meshCount(); ++i) {
+        const Mesh *mesh = scene.meshAt(i);
+        if (mesh != nullptr && !mesh->hasUvs()) {
+            missingUvs = true;
+        }
+    }
+    if (missingUvs) {
+        addWarningOnce(warnings,
+                       "há malhas sem UV; elas saem do arquivo sem coordenadas de textura");
+    }
+
+    // What the editor holds that the destination format cannot carry.
+    addWarningOnce(warnings,
+                   "a textura composta não vai no arquivo do modelo; exporte o PNG e associe-o "
+                   "no destino");
+    if (format == ModelFormat::Obj) {
+        addWarningOnce(warnings,
+                       "OBJ guarda só nome, cor difusa e opacidade: sem hierarquia de materiais "
+                       "nem PBR");
+    } else {
+        addWarningOnce(warnings,
+                       "apenas o primeiro canal UV e a cor difusa do material vão no arquivo");
+    }
+    if (scene.selected() >= 0) {
+        addWarningOnce(warnings, "o arquivo contém todas as malhas, não só a selecionada");
+    }
+    return warnings;
+}
+
 bool exportModel(const Scene &scene, ModelFormat format, const std::string &baseName,
                  ModelExport &output, std::string &error) {
     output.files.clear();
@@ -211,11 +248,8 @@ bool exportModel(const Scene &scene, ModelFormat format, const std::string &base
             error = "a malha " + std::to_string(i) + " não pode ser exportada: " + meshError;
             return false;
         }
-        if (!mesh->hasUvs()) {
-            addWarningOnce(output.warnings,
-                           "há malhas sem UV; elas saem do arquivo sem coordenadas de textura");
-        }
     }
+    output.warnings = exportWarnings(scene, format);
 
     std::unique_ptr<aiScene> aiScene = buildScene(scene, baseName);
 
@@ -249,23 +283,6 @@ bool exportModel(const Scene &scene, ModelFormat format, const std::string &base
         output.files.push_back(std::move(file));
     }
     exporter.FreeBlob();
-
-    // What the editor holds that the destination format cannot carry, told rather than hidden:
-    // PLAN asks the editor to say when information could not be preserved.
-    addWarningOnce(output.warnings,
-                   "a textura composta não vai no arquivo do modelo; exporte o PNG e associe-o "
-                   "no destino");
-    if (format == ModelFormat::Obj) {
-        addWarningOnce(output.warnings,
-                       "OBJ guarda só nome, cor difusa e opacidade: sem hierarquia de materiais "
-                       "nem PBR");
-    } else {
-        addWarningOnce(output.warnings,
-                       "apenas o primeiro canal UV e a cor difusa do material vão no arquivo");
-    }
-    if (scene.selected() >= 0) {
-        addWarningOnce(output.warnings, "o arquivo contém todas as malhas, não só a selecionada");
-    }
     return true;
 }
 

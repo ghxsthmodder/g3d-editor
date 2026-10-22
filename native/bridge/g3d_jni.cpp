@@ -11,6 +11,7 @@
 
 #include "core/document.hpp"
 #include "core/primitives.hpp"
+#include "exporters/model_exporter.hpp"
 #include "renderer/g3d_renderer.hpp"
 #include "texture/g3d_image.hpp"
 #include "texture/texture_studio.hpp"
@@ -58,6 +59,39 @@ jstring studioReply(JNIEnv *env, const char *prefix) {
     std::ostringstream stream;
     stream << prefix << "\n" << g3d::TextureStudio::instance().describe();
     return toJString(env, stream.str());
+}
+
+jbyteArray toByteArray(JNIEnv *env, const std::vector<uint8_t> &bytes) {
+    jbyteArray out = env->NewByteArray(static_cast<jsize>(bytes.size()));
+    if (out != nullptr) {
+        env->SetByteArrayRegion(out, 0, static_cast<jsize>(bytes.size()),
+                                reinterpret_cast<const jbyte *>(bytes.data()));
+    }
+    return out;
+}
+
+std::string readString(JNIEnv *env, jstring text) {
+    std::string out;
+    if (text != nullptr) {
+        const char *chars = env->GetStringUTFChars(text, nullptr);
+        if (chars != nullptr) {
+            out = chars;
+            env->ReleaseStringUTFChars(text, chars);
+        }
+    }
+    return out;
+}
+
+// The three formats the interface offers, in the order Native.kt documents them.
+g3d::ModelFormat modelFormatOf(jint format) {
+    switch (format) {
+    case 1:
+        return g3d::ModelFormat::Gltf;
+    case 2:
+        return g3d::ModelFormat::Glb;
+    default:
+        return g3d::ModelFormat::Obj;
+    }
 }
 
 }  // namespace
@@ -547,6 +581,65 @@ JNIEXPORT jbyteArray JNICALL Java_com_g3d_editor_Native_nativeTexturePng(JNIEnv 
                                 reinterpret_cast<const jbyte *>(png.data()));
     }
     return out;
+}
+
+// --- model export ----------------------------------------------------------------------
+
+JNIEXPORT jstring JNICALL
+Java_com_g3d_editor_Native_nativeExportWarnings(JNIEnv *env, jclass, jint format) {
+    std::ostringstream stream;
+    g3d::Document::instance().withScene([&stream, &format](g3d::Scene &scene) {
+        for (const std::string &warning : g3d::exportWarnings(scene, modelFormatOf(format))) {
+            stream << warning << "\n";
+        }
+    });
+    return toJString(env, stream.str());
+}
+
+/**
+ * One coarse operation: writes the open scene and hands back every file the format produces, the
+ * one the user names first. Null when nothing could be exported; the reason goes to logcat.
+ */
+JNIEXPORT jobjectArray JNICALL
+Java_com_g3d_editor_Native_nativeExportModel(JNIEnv *env, jclass, jstring baseName, jint format) {
+    const std::string name = readString(env, baseName);
+    g3d::ModelExport output;
+    std::string error;
+    bool exported = false;
+    g3d::Document::instance().withScene([&](g3d::Scene &scene) {
+        exported = g3d::exportModel(scene, modelFormatOf(format), name, output, error);
+    });
+    if (!exported) {
+        __android_log_print(ANDROID_LOG_ERROR, kTag, "export: %s", error.c_str());
+        return nullptr;
+    }
+
+    jclass fileClass = env->FindClass("com/g3d/editor/Native$ExportedFile");
+    if (fileClass == nullptr) {
+        return nullptr;  // FindClass already reported the missing class
+    }
+    jmethodID constructor = env->GetMethodID(fileClass, "<init>", "(Ljava/lang/String;[B)V");
+    if (constructor == nullptr) {
+        return nullptr;
+    }
+    jobjectArray files =
+        env->NewObjectArray(static_cast<jsize>(output.files.size()), fileClass, nullptr);
+    if (files == nullptr) {
+        return nullptr;
+    }
+    for (size_t i = 0; i < output.files.size(); ++i) {
+        jstring fileName = env->NewStringUTF(output.files[i].name.c_str());
+        jbyteArray bytes = toByteArray(env, output.files[i].bytes);
+        jobject file = env->NewObject(fileClass, constructor, fileName, bytes);
+        if (file == nullptr) {
+            return nullptr;
+        }
+        env->SetObjectArrayElement(files, static_cast<jsize>(i), file);
+        env->DeleteLocalRef(fileName);
+        env->DeleteLocalRef(bytes);
+        env->DeleteLocalRef(file);
+    }
+    return files;
 }
 
 }  // extern "C"

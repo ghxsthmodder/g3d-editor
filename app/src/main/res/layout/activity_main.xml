@@ -321,6 +321,45 @@
                     android:layout_height="0dp"
                     android:layout_weight="1"
                     android:orientation="vertical" />
+
+                <!-- Three named buttons, not a glyph: the format decides which files land in the
+                     folder, and PLAN asks that an action this important is never hidden. -->
+                <TextView
+                    style="@style/Widget.G3D.SectionLabel"
+                    android:paddingTop="6dp"
+                    android:text="@string/export_title" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/exportObj"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/export_obj" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/exportGltf"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/export_gltf" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/exportGlb"
+                        style="@style/ToolButton.Outlined"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/export_glb" />
+                </LinearLayout>
             </LinearLayout>
 
             <LinearLayout

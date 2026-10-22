@@ -3,6 +3,7 @@ package com.g3d.editor
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.view.View
 import android.widget.CheckBox
@@ -44,6 +45,11 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private var uvMesh = -1
     private var logVisible = false
     private var selectedLayer = -1
+
+    // The name the model came in with, kept as the base name exports go out under, and the format
+    // whose button opened the folder picker.
+    private var modelName = "modelo"
+    private var pendingFormat = FORMAT_GLB
 
     private lateinit var viewport: ModelView
     private lateinit var inspectorPanel: View
@@ -91,6 +97,14 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         registerForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri: Uri? ->
             if (uri != null) writeTexturePng(uri)
             else report(getString(R.string.status_texture_export_cancelled))
+        }
+
+    // A folder and not a file: OBJ and glTF come out as a pair that reference each other by name,
+    // so the two pieces have to be written side by side for the export to be usable.
+    private val exportModelTo =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { treeUri: Uri? ->
+            if (treeUri != null) writeModel(treeUri, pendingFormat)
+            else report(getString(R.string.status_model_export_cancelled))
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -141,6 +155,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             report("câmera ajustada ao conteúdo")
         }
         findViewById<View>(R.id.nativeDiagnostic).setOnClickListener { runUvDiagnostic() }
+        findViewById<View>(R.id.exportObj).setOnClickListener { startModelExport(FORMAT_OBJ) }
+        findViewById<View>(R.id.exportGltf).setOnClickListener { startModelExport(FORMAT_GLTF) }
+        findViewById<View>(R.id.exportGlb).setOnClickListener { startModelExport(FORMAT_GLB) }
         findViewById<View>(R.id.closeInspector).setOnClickListener { hideInspector() }
         inspectorTabs.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
@@ -813,6 +830,118 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         }.start()
     }
 
+    // --- model export ----------------------------------------------------------------------
+
+    private fun startModelExport(format: Int) {
+        if (busy || !Native.isAvailable) return
+        if (rows.isEmpty()) {
+            report(getString(R.string.status_model_export_empty))
+            return
+        }
+        // Said before the folder is picked: the format drops things the editor is holding, and the
+        // choice of where to put the file is easier to make knowing that.
+        val warnings = Native.nativeExportWarnings(format)
+            .lineSequence().filter { it.isNotBlank() }.toList()
+        if (warnings.isNotEmpty()) {
+            report(
+                getString(
+                    R.string.status_model_export_warnings,
+                    formatLabel(format),
+                    warnings.joinToString("; ")
+                )
+            )
+        }
+        pendingFormat = format
+        exportModelTo.launch(null)
+    }
+
+    private fun writeModel(treeUri: Uri, format: Int) {
+        if (busy) return
+        val label = formatLabel(format)
+        beginWork(getString(R.string.status_model_exporting, label))
+        Thread {
+            val startedAt = System.currentTimeMillis()
+            val message = try {
+                val files = Native.nativeExportModel(exportBaseName(), format)
+                if (files == null || files.isEmpty()) {
+                    throw IllegalStateException("o núcleo não devolveu nenhum arquivo")
+                }
+                val listing = files.joinToString(" + ") { file ->
+                    writeIntoFolder(treeUri, file)
+                    "${file.name} (${file.bytes.size / 1024} KB)"
+                }
+                // The summary goes last: the line over the canvas shows the last one written, and
+                // "GLB exportado" is the part that has to be readable without opening the log. The
+                // list of what the format drops was already said, before the folder was chosen.
+                pairNote(files) +
+                    getString(
+                        R.string.status_model_exported,
+                        label,
+                        "$listing em ${System.currentTimeMillis() - startedAt} ms"
+                    )
+            } catch (error: Throwable) {
+                getString(R.string.status_model_export_failed, label, error.message ?: "?")
+            }
+            runOnUiThread { finishWork(message) }
+        }.start()
+    }
+
+    /** The name the file goes out under, without the characters a document provider will not take. */
+    private fun exportBaseName(): String =
+        modelName.replace(Regex("[^A-Za-z0-9 ._-]"), "_").ifBlank { "modelo" }
+
+    /**
+     * Writes one file into the chosen folder, overwriting the one that is already there under that
+     * name: the description references its companion by name, so a second copy with a suffix would
+     * leave it pointing at the previous export.
+     */
+    private fun writeIntoFolder(treeUri: Uri, file: Native.ExportedFile) {
+        val target = folderChild(treeUri, file.name)
+            ?: DocumentsContract.createDocument(
+                contentResolver, treeUri, MIME_MODEL_FILE, file.name)
+            ?: throw IllegalStateException(
+                getString(R.string.status_model_export_write, file.name,
+                          "a pasta recusou criar o arquivo"))
+        val stream = contentResolver.openOutputStream(target)
+            ?: throw IllegalStateException(
+                getString(R.string.status_model_export_write, file.name, "fluxo indisponível"))
+        stream.use { it.write(file.bytes) }
+    }
+
+    private fun folderChild(treeUri: Uri, name: String): Uri? {
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(
+            treeUri, DocumentsContract.getTreeDocumentId(treeUri))
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+        return try {
+            contentResolver.query(children, projection, null, null, null)?.use { cursor: Cursor ->
+                val idColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                while (cursor.moveToNext()) {
+                    if (idColumn >= 0 && nameColumn >= 0 && cursor.getString(nameColumn) == name) {
+                        return DocumentsContract.buildDocumentUriUsingTree(
+                            treeUri, cursor.getString(idColumn))
+                    }
+                }
+                null
+            }
+        } catch (_: Throwable) {
+            // A folder that will not list its children is handled by creating the file instead.
+            null
+        }
+    }
+
+    private fun pairNote(files: Array<Native.ExportedFile>): String =
+        if (files.size < 2) "" else "\n" +
+            getString(R.string.status_model_export_pair, files[1].name, files[0].name)
+
+    private fun formatLabel(format: Int): String = when (format) {
+        FORMAT_OBJ -> getString(R.string.export_obj)
+        FORMAT_GLTF -> getString(R.string.export_gltf)
+        else -> getString(R.string.export_glb)
+    }
+
     // --- import --------------------------------------------------------------------------
 
     private fun importUri(uri: Uri) {
@@ -835,6 +964,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             }
 
             var imported = false
+            var openedName = modelName
             val message = when (outcome) {
                 is Failure -> outcome.message
                 is Contents -> {
@@ -851,6 +981,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                             )
                         } else {
                             imported = true
+                            openedName = name.substringBeforeLast('.', name)
                             getString(R.string.status_import_done, elapsed, name)
                         }
                     }
@@ -860,6 +991,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             runOnUiThread {
                 if (imported) {
                     // The scene was rebuilt, so an open session would apply to the wrong mesh.
+                    modelName = openedName
                     if (uvOpen) {
                         Native.nativeUvCancel()
                         closeUvEditor()
@@ -1042,6 +1174,13 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         const val SPLIT_ATLAS = 0.22f
 
         val SUPPORTED_EXTENSIONS = setOf("obj", "gltf", "glb")
+        // The three formats Native.nativeExportModel knows, in the order the bridge maps them.
+        const val FORMAT_OBJ = 0
+        const val FORMAT_GLTF = 1
+        const val FORMAT_GLB = 2
+        // Providers are free to rewrite a name for a mime type they recognise; octet-stream keeps
+        // the extension the exporter chose, which is the name the companion is referenced by.
+        const val MIME_MODEL_FILE = "application/octet-stream"
         val SUPPORTED_IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg")
         val OPACITY_PATTERN = Regex("op=(\\d+)%")
         const val MEGABYTE = 1024L * 1024L

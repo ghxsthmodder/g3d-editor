@@ -136,4 +136,24 @@ object Native {
     external fun nativeTextureScale(id: Int, factor: Float): Boolean
 
     external fun nativeTexturePng(): ByteArray?
+
+    /**
+     * One file of a model export: the name to write it under, and its bytes. OBJ and glTF come out
+     * as a pair, the description and the companion it references by that very name, so both have to
+     * land in the same folder with those exact names.
+     */
+    class ExportedFile(val name: String, val bytes: ByteArray)
+
+    /**
+     * What the format cannot hold about the open scene, one line each, before the user picks a
+     * folder. Exporting reports the same list.
+     */
+    external fun nativeExportWarnings(format: Int): String
+
+    /**
+     * Writes the open scene as `format`: 0 OBJ, 1 glTF, 2 GLB. `baseName` is the file name without
+     * its extension, because the exporters put it inside the description as the reference to the
+     * companion. Null when there is nothing to export.
+     */
+    external fun nativeExportModel(baseName: String, format: Int): Array<ExportedFile>?
 }

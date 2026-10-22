@@ -23,6 +23,19 @@
     <string name="viewport_hint">toque seleciona · arrasta orbita ou move a ilha · 2 dedos movem · pinça aproxima</string>
     <string name="diagnostic_uv">Diagnóstico de UV</string>
 
+    <string name="export_title">Exportar modelo</string>
+    <string name="export_obj">OBJ</string>
+    <string name="export_gltf">glTF</string>
+    <string name="export_glb">GLB</string>
+    <string name="status_model_exporting">gravando o modelo em %1$s …</string>
+    <string name="status_model_exported">%1$s exportado (%2$s)</string>
+    <string name="status_model_export_failed">a exportação do %1$s falhou: %2$s</string>
+    <string name="status_model_export_cancelled">exportação cancelada</string>
+    <string name="status_model_export_empty">nada para exportar: não há modelo aberto</string>
+    <string name="status_model_export_write">não foi possível escrever %1$s: %2$s</string>
+    <string name="status_model_export_pair">%1$s é chamado dentro de %2$s: mantenha os dois na mesma pasta</string>
+    <string name="status_model_export_warnings">o %1$s não guarda: %2$s</string>
+
     <string name="uv_title">Editor UV</string>
     <string name="uv_generate_title">Geração</string>
     <string name="uv_padding_hint">margem</string>

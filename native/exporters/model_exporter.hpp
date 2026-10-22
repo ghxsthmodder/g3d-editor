@@ -33,6 +33,11 @@ const char *modelFormatId(ModelFormat format);
 std::string modelFormatLabel(ModelFormat format);
 std::string modelFormatExtension(ModelFormat format);
 
+// What the destination format cannot hold about this scene, said rather than hidden: PLAN asks the
+// editor to report when information could not be preserved. Exporting adds nothing to the list, so
+// the interface can show it before the user picks a folder.
+std::vector<std::string> exportWarnings(const Scene &scene, ModelFormat format);
+
 // Writes the scene through Assimp in memory. The base name has to be the file name the user chose
 // without its extension: the exporters put it inside the description as the reference to the
 // companion, so a piece renamed afterwards would point at a file that does not exist.

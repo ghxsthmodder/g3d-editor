@@ -46,9 +46,36 @@ public:
         return append(values.data(), values.size() * sizeof(float));
     }
 
+    Blob appendUint32s(const std::vector<uint32_t> &values) {
+        return append(values.data(), values.size() * sizeof(uint32_t));
+    }
+
 private:
     std::vector<uint8_t> &buffer_;
 };
+
+// Reads an array out of the binary chunk, taking how many there are from the block itself. Used for
+// the geometry, where the count is part of what is being carried rather than something to check a
+// mesh against.
+template <typename T>
+bool readArray(const std::vector<uint8_t> &bin, const Blob &blob, std::vector<T> &out,
+               std::string &error) {
+    if (blob.length % sizeof(T) != 0u) {
+        error = "o bloco tem " + std::to_string(blob.length) + " bytes, que nao se dividem em " +
+                std::to_string(sizeof(T)) +
+                "; ou a geometria foi gravada torta, ou o arquivo nao e deste editor";
+        return false;
+    }
+    if (static_cast<size_t>(blob.offset) + blob.length > bin.size()) {
+        error = "o bloco aponta para fora do arquivo";
+        return false;
+    }
+    out.resize(blob.length / sizeof(T));
+    if (!out.empty()) {
+        std::memcpy(out.data(), bin.data() + blob.offset, blob.length);
+    }
+    return true;
+}
 
 // Reads a float array out of the binary chunk. False, with the reason, when the reference points
 // outside the file: a project that has been truncated is reported, not half applied.
@@ -143,6 +170,19 @@ private:
     const std::string &error_;
 };
 
+// What one mesh carries into the project beyond the model file: its UVs, and for a mesh the UV
+// session rebuilt, the geometry those UVs are measured against. A mesh the file still describes
+// needs only the first — its vertices are in the file already, and writing a second copy of them
+// would buy nothing.
+struct MeshEntry {
+    uint32_t index = 0;
+    std::vector<float> uvs;
+    std::vector<float> positions;
+    std::vector<float> normals;
+    std::vector<uint32_t> triangles;
+    bool rebuilt = false;
+};
+
 }  // namespace
 
 std::string projectReport() {
@@ -170,14 +210,26 @@ bool saveProject(std::vector<uint8_t> &out, ProjectReport &report, std::string &
     }
     const std::string modelName = document.sourceName();
 
-    // UVs per mesh, in mesh order, and only the meshes that have any.
-    std::vector<std::pair<uint32_t, std::vector<float>>> layouts;
-    document.withScene([&layouts](Scene &scene) {
+    // UVs per mesh, in mesh order, and only the meshes that have any. A mesh the UV session
+    // replaced does not match the embedded file any more, so its geometry comes along too.
+    const std::vector<uint32_t> rebuilt = document.rebuiltMeshes();
+    std::vector<MeshEntry> layouts;
+    document.withScene([&layouts, &rebuilt](Scene &scene) {
         for (uint32_t index = 0; index < scene.meshCount(); ++index) {
             const Mesh *mesh = scene.meshAt(index);
-            if (mesh != nullptr && mesh->hasUvs()) {
-                layouts.emplace_back(index, mesh->uvs);
+            if (mesh == nullptr || !mesh->hasUvs()) {
+                continue;
             }
+            MeshEntry entry;
+            entry.index = index;
+            entry.uvs = mesh->uvs;
+            entry.rebuilt = std::find(rebuilt.begin(), rebuilt.end(), index) != rebuilt.end();
+            if (entry.rebuilt) {
+                entry.positions = mesh->positions;
+                entry.normals = mesh->normals;
+                entry.triangles = mesh->indices;
+            }
+            layouts.push_back(std::move(entry));
         }
     });
 
@@ -210,8 +262,17 @@ bool saveProject(std::vector<uint8_t> &out, ProjectReport &report, std::string &
     }
 
     std::vector<Blob> uvBlobs(layouts.size());
+    std::vector<Blob> positionBlobs(layouts.size());
+    std::vector<Blob> normalBlobs(layouts.size());
+    std::vector<Blob> triangleBlobs(layouts.size());
     for (size_t i = 0; i < layouts.size(); ++i) {
-        uvBlobs[i] = sink.appendFloats(layouts[i].second);
+        const MeshEntry &entry = layouts[i];
+        uvBlobs[i] = sink.appendFloats(entry.uvs);
+        if (entry.rebuilt) {
+            positionBlobs[i] = sink.appendFloats(entry.positions);
+            normalBlobs[i] = sink.appendFloats(entry.normals);
+            triangleBlobs[i] = sink.appendUint32s(entry.triangles);
+        }
     }
 
     rapidjson::StringBuffer text;
@@ -231,15 +292,35 @@ bool saveProject(std::vector<uint8_t> &out, ProjectReport &report, std::string &
     writer.Key("meshes");
     writer.StartArray();
     for (size_t i = 0; i < layouts.size(); ++i) {
+        const MeshEntry &entry = layouts[i];
         writer.StartObject();
         writer.Key("index");
-        writer.Uint(layouts[i].first);
+        writer.Uint(entry.index);
         writer.Key("count");
-        writer.Uint(static_cast<uint32_t>(layouts[i].second.size()));
+        writer.Uint(static_cast<uint32_t>(entry.uvs.size()));
         writer.Key("uvOffset");
         writer.Uint(uvBlobs[i].offset);
         writer.Key("uvLength");
         writer.Uint(uvBlobs[i].length);
+        if (entry.rebuilt) {
+            // Read before the UVs on the way back in: the file would put a mesh with a different
+            // number of vertices where this one is, and the UVs have nothing to land on until the
+            // shape they were made for is standing there.
+            writer.Key("rebuilt");
+            writer.Bool(true);
+            writer.Key("positionOffset");
+            writer.Uint(positionBlobs[i].offset);
+            writer.Key("positionLength");
+            writer.Uint(positionBlobs[i].length);
+            writer.Key("normalOffset");
+            writer.Uint(normalBlobs[i].offset);
+            writer.Key("normalLength");
+            writer.Uint(normalBlobs[i].length);
+            writer.Key("triangleOffset");
+            writer.Uint(triangleBlobs[i].offset);
+            writer.Key("triangleLength");
+            writer.Uint(triangleBlobs[i].length);
+        }
         writer.EndObject();
     }
     writer.EndArray();
@@ -374,6 +455,7 @@ bool openProject(const void *data, size_t length, const std::string &name, Proje
     report.modelBytes = modelBlob.length;
 
     const auto meshes = json.FindMember("meshes");
+    std::vector<uint32_t> restoredShapes;
     if (meshes != json.MemberEnd() && meshes->value.IsArray()) {
         std::string reason;
         document.withScene([&](Scene &scene) {
@@ -394,21 +476,71 @@ bool openProject(const void *data, size_t length, const std::string &name, Proje
                                        " nao existe mais no modelo: os UVs dela ficam de fora");
                     continue;
                 }
-                // The mesh decides how many UVs it needs: one pair per vertex, whatever the project
-                // counted when it was written. A model that was rebuilt since then is the only way
-                // these two can disagree, and the disagreement is reported, not patched.
-                const size_t wanted = static_cast<size_t>(mesh->vertexCount()) * 2u;
+                const bool carriesShape = boolOf(entry, "rebuilt", false);
+                std::vector<float> positions;
+                std::vector<float> normals;
+                std::vector<uint32_t> triangles;
+                size_t vertices = mesh->vertexCount();
+                // A project written after a UV generation carries the mesh those UVs were made for,
+                // because the file imported above describes one with fewer vertices in its place.
+                // Everything lands in locals first: a project that cannot hand over a whole mesh
+                // leaves the mesh standing there as it is, rather than half restored.
+                if (carriesShape) {
+                    Blob positionBlob;
+                    Blob normalBlob;
+                    Blob triangleBlob;
+                    std::string shapeReason;
+                    bool fits = readBlob(entry, "position", positionBlob, chunks.bin.size(),
+                                         shapeReason) &&
+                                readBlob(entry, "normal", normalBlob, chunks.bin.size(),
+                                         shapeReason) &&
+                                readBlob(entry, "triangle", triangleBlob, chunks.bin.size(),
+                                         shapeReason) &&
+                                readArray(chunks.bin, positionBlob, positions, shapeReason) &&
+                                readArray(chunks.bin, normalBlob, normals, shapeReason) &&
+                                readArray(chunks.bin, triangleBlob, triangles, shapeReason);
+                    vertices = positions.size() / 3u;
+                    // The corners have to address the positions delivered with them: they are
+                    // uploaded together, and a file that says otherwise would read past the end.
+                    for (const uint32_t corner : triangles) {
+                        if (corner >= vertices) {
+                            fits = false;
+                            shapeReason = "um indice aponta para o vertex " +
+                                          std::to_string(corner) + ", e a malha tem " +
+                                          std::to_string(vertices);
+                            break;
+                        }
+                    }
+                    if (!fits) {
+                        addWarningOnce(report.warnings, "a malha " + std::to_string(index) +
+                                                            " nao trouxe a geometria: " +
+                                                            shapeReason);
+                        continue;
+                    }
+                }
+                // One pair per vertex, of the mesh the UVs were measured against.
                 std::vector<float> uvs;
                 std::string tooShort;
-                if (!readFloats(chunks.bin, uvBlob, wanted, uvs, tooShort)) {
+                if (!readFloats(chunks.bin, uvBlob, vertices * 2u, uvs, tooShort)) {
                     addWarningOnce(report.warnings, "a malha " + std::to_string(index) +
                                                         " nao recebeu os UVs: " + tooShort);
                     continue;
+                }
+                if (carriesShape) {
+                    mesh->positions = std::move(positions);
+                    mesh->normals = std::move(normals);
+                    mesh->indices = std::move(triangles);
+                    restoredShapes.push_back(index);
                 }
                 mesh->uvs = std::move(uvs);
                 ++report.meshes;
             }
         });
+    }
+    // The scene now holds geometry the embedded file does not describe, so the next save keeps
+    // carrying it for the same reason this one had to.
+    for (const uint32_t index : restoredShapes) {
+        document.noteRebuilt(index);
     }
 
     const auto texture = json.FindMember("texture");

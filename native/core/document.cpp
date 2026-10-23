@@ -1,11 +1,23 @@
 #include "core/document.hpp"
 
+#include <algorithm>
 #include <utility>
 
 #include "core/primitives.hpp"
 #include "importers/assimp_importer.hpp"
 
 namespace g3d {
+namespace {
+
+// Records a mesh index once: the list is read by the save, which does not care how often a mesh was
+// rebuilt, only that it was.
+void addOnce(std::vector<uint32_t> &list, uint32_t index) {
+    if (std::find(list.begin(), list.end(), index) == list.end()) {
+        list.push_back(index);
+    }
+}
+
+}  // namespace
 
 Document &Document::instance() {
     static Document document;
@@ -40,6 +52,9 @@ bool Document::importModel(const void *data, size_t length, const std::string &h
     const uint8_t *bytes = static_cast<const uint8_t *>(data);
     source_.assign(bytes, bytes + length);
     sourceName_ = hint;
+    // Every mesh is the one the new file describes again, so none of them needs its geometry kept
+    // in a project any more.
+    rebuilt_.clear();
     return true;
 }
 
@@ -100,7 +115,18 @@ bool Document::replaceMesh(uint32_t index, const Mesh &mesh) {
         return false;
     }
     *target = mesh;
+    addOnce(rebuilt_, index);
     return true;
+}
+
+std::vector<uint32_t> Document::rebuiltMeshes() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return rebuilt_;
+}
+
+void Document::noteRebuilt(uint32_t index) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    addOnce(rebuilt_, index);
 }
 
 std::string Document::lastImportReport() {

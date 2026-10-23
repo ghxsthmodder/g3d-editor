@@ -42,14 +42,14 @@ Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembl
 dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
 não é necessário.
 
-Medidas do último *build* de depuração: `app-debug.apk` de 18.695.107 bytes (17,8 MiB), com
-`libg3dnative.so` despojado de 5.199.440 bytes (arm64-v8a) e 5.040.048 bytes (x86_64), os dois
+Medidas do último *build* de depuração: `app-debug.apk` de 18.700.931 bytes (17,8 MiB), com
+`libg3dnative.so` despojado de 5.204.648 bytes (arm64-v8a) e 5.045.872 bytes (x86_64), os dois
 empacotados sem compressão. O módulo de projeto traz o RapidJSON que já vinha com o
 Assimp (cabeçalhos, instanciados onde o projeto é escrito e lido), e é dele boa parte desse aumento.
 É Debug com símbolos parciais, não Release: o número serve para acompanhar a tendência quando algo é
 incorporado, não como tamanho de distribuição. A forma de distribuição é menor:
-`assembleRelease` produz `app-release-unsigned.apk` de 11.410.681 bytes (10,9 MiB), com o
-`libg3dnative.so` despojado de 2.973.264 bytes (arm64-v8a) e 3.093.336 bytes (x86_64). É o APK sem
+`assembleRelease` produz `app-release-unsigned.apk` de 11.418.441 bytes (10,9 MiB), com o
+`libg3dnative.so` despojado de 2.979.752 bytes (arm64-v8a) e 3.101.096 bytes (x86_64). É o APK sem
 assinatura: o bloco `META-INF` que a assinatura acrescenta não foi medido. Os exportadores de OBJ e
 glTF do Assimp, ligados nesta contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais da
 interface são 29 arquivos XML que somam 13.927 bytes de fonte; no APK eles entram no bloco de

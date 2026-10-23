@@ -219,12 +219,104 @@ void testSaveAndOpen() {
           "um projeto cortado é recusado");
 }
 
+// --- a project that carries the geometry a generation produced --------------------------------
+// Moving an island keeps the mesh as the file describes it, so its UVs alone are enough. Generating
+// is different: xatlas welds the mesh and reopens it along the seams, and the result is another
+// mesh. A project storing only its UVs would hand the model back the coordinates it never lost.
+void testGeneratedGeometry() {
+    std::string error;
+    g3d::Document &document = g3d::Document::instance();
+    g3d::TextureStudio &studio = g3d::TextureStudio::instance();
+    g3d::UvEditor &editor = g3d::UvEditor::instance();
+    editor.cancel();
+    studio.reset();
+
+    const std::string scenePath = std::string(G3D_TEST_MODEL_DIR) + "/two-objects.obj";
+    const std::vector<char> sceneBytes = readAll(scenePath);
+    check(document.importModel(sceneBytes.data(), sceneBytes.size(), scenePath, error),
+          "importa o modelo outra vez: " + error);
+
+    std::vector<float> filePositions;
+    uint32_t fileVertices = 0;
+    document.withScene([&](g3d::Scene &scene) {
+        filePositions = scene.meshAt(0)->positions;
+        fileVertices = scene.meshAt(0)->vertexCount();
+    });
+
+    g3d::UvOptions options;
+    options.padding = 2;
+    check(editor.generate(0, options, error), "gera os UVs da primeira malha: " + error);
+    check(editor.apply(error), "e aplica a malha gerada na cena: " + error);
+
+    std::vector<float> positionsGenerated;
+    std::vector<float> uvsGenerated;
+    uint32_t generatedVertices = 0;
+    document.withScene([&](g3d::Scene &scene) {
+        positionsGenerated = scene.meshAt(0)->positions;
+        uvsGenerated = scene.meshAt(0)->uvs;
+        generatedVertices = scene.meshAt(0)->vertexCount();
+    });
+    check(uvsGenerated.size() == generatedVertices * 2u, "cada vértice recebeu um par de UVs");
+    // The vertex count is not what gives the generation away: this cube comes back with the same
+    // twenty-four vertices in another order, so UVs saved on their own would have fitted and landed
+    // on the wrong corners, with nothing to report.
+    check(positionsGenerated != filePositions,
+          "a malha gerada não é a do arquivo, com seus " + std::to_string(fileVertices) +
+              " vértices");
+
+    std::vector<uint8_t> project;
+    g3d::ProjectReport saved;
+    check(g3d::saveProject(project, saved, error), "salvar o projeto gerado: " + error);
+    check(saved.warnings.empty(),
+          "nada ficou de fora: " + (saved.warnings.empty() ? std::string() : saved.warnings[0]));
+    check(saved.meshes >= 1, "a malha gerada vai no arquivo");
+
+    studio.reset();
+    editor.cancel();
+    g3d::ProjectReport opened;
+    const std::vector<uint8_t> copy = project;
+    check(g3d::openProject(copy.data(), copy.size(), "gerado.g3dp", opened, error),
+          "reabrir o projeto gerado: " + error);
+    check(opened.meshes == saved.meshes, "a reabertura traz as mesmas malhas");
+    check(opened.warnings.empty(),
+          "e não teve de recusar nenhum UV: " +
+              (opened.warnings.empty() ? std::string() : opened.warnings[0]));
+
+    std::vector<float> positionsRestored;
+    std::vector<float> uvsRestored;
+    document.withScene([&](g3d::Scene &scene) {
+        positionsRestored = scene.meshAt(0)->positions;
+        uvsRestored = scene.meshAt(0)->uvs;
+    });
+    check(positionsRestored == positionsGenerated, "a malha volta com a geometria da geração");
+    check(uvsRestored == uvsGenerated, "e com os UVs daquela geração, exatamente");
+    check(positionsRestored != filePositions, "não com a ordem que o arquivo descreve");
+
+    // The reopened scene still does not match the embedded file, so saving it again carries the
+    // geometry once more rather than quietly falling back to the UVs that will not fit.
+    std::vector<uint8_t> again;
+    g3d::ProjectReport resaved;
+    check(g3d::saveProject(again, resaved, error), "salvar depois de reabrir: " + error);
+    check(resaved.warnings.empty(), "e o segundo salvar não perde nada");
+    check(again.size() == copy.size(), "o projeto regravado tem o mesmo tamanho");
+    g3d::ProjectReport second;
+    check(g3d::openProject(again.data(), again.size(), "gerado2.g3dp", second, error),
+          "reabrir o projeto regravado: " + error);
+    std::vector<float> uvsTwice;
+    document.withScene([&uvsTwice](g3d::Scene &scene) { uvsTwice = scene.meshAt(0)->uvs; });
+    check(uvsTwice == uvsGenerated, "os UVs sobrevivem a duas idas e voltas");
+
+    editor.cancel();
+    studio.reset();
+}
+
 }  // namespace
 
 int main() {
     std::printf("== arquivo de projeto ==\n");
     testContainer();
     testSaveAndOpen();
+    testGeneratedGeometry();
     std::printf("\n%d verificacoes, %d falhas\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

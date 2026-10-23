@@ -14,8 +14,10 @@ referência e exportação em PNG — seguem como estavam. O modelo agora sai em
 cena aberta, com os UVs que o editor acabou de criar, é exportada para uma pasta escolhida e o
 companheiro do par (`.mtl` / `.bin`) é gravado junto, com aviso do que o formato não guarda. O
 editor também **salva e reabre o projeto** em `.g3dp`: os bytes do modelo de onde a cena veio, os
-UVs de cada malha e a pilha de camadas com suas imagens, todos dentro de um arquivo só, sem depender
-do caminho em que o modelo foi encontrado — o formato está descrito em [docs/PROJECT.md](docs/PROJECT.md).
+UVs de cada malha — com a geometria daquela que a geração de UV reconstruiu, que é outra malha, não
+a mesma em outro tamanho — e a pilha de camadas com suas imagens, tudo dentro de um arquivo só, sem
+depender do caminho em que o modelo foi encontrado — o formato está descrito em
+[docs/PROJECT.md](docs/PROJECT.md).
 O desfazer e o refazer cobrem a sessão de UV: um arrasto é um passo, e uma geração pode ser desfeita
 até o layout que veio do arquivo. Cobrem também o documento do compositor — resolução da tela, cor de
 fundo e a pilha inteira, um passo por clique —, e como as imagens das camadas são compartilhadas, um

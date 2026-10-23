@@ -27,7 +27,8 @@ public:
     int selected();
     void select(int index);
 
-    // Replaces one mesh, keeping the rest of the scene. Used when an edited UV layout is applied.
+    // Replaces one mesh, keeping the rest of the scene. Used when an edited UV layout is applied,
+    // which is also when the mesh stops being the one the source file describes.
     bool replaceMesh(uint32_t index, const Mesh &mesh);
 
     // Calls fn(Scene&) with the document locked. Used by the renderer to copy geometry.
@@ -60,6 +61,18 @@ public:
     size_t sourceBytes() const;
     size_t meshBytes() const;
 
+    // Which meshes no longer hold the geometry the file in `source_` describes. Applying a UV
+    // session replaces a mesh with a copy where a vertex touched by faces on both sides of a seam
+    // becomes two, one for each place of the atlas each side lands on, so the copy has more
+    // vertices than the file describes. The project carries the file rather than the scene, so the
+    // mesh standing where that one was will not fit the saved UVs: a mesh named here goes into the
+    // file with its geometry next to them.
+    std::vector<uint32_t> rebuiltMeshes() const;
+
+    // Says that a mesh came out of a project rather than out of the file embedded in it, so the
+    // next save keeps carrying its geometry instead of trusting the file to reproduce it.
+    void noteRebuilt(uint32_t index);
+
 private:
     Document();
 
@@ -68,6 +81,7 @@ private:
     std::string lastReport_;
     std::vector<uint8_t> source_;
     std::string sourceName_;
+    std::vector<uint32_t> rebuilt_;
 };
 
 }  // namespace g3d

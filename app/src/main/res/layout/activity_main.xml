@@ -34,6 +34,13 @@
                 android:paddingBottom="4dp">
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/projectNew"
+                    style="@style/Widget.G3D.Icon"
+                    android:contentDescription="@string/new_project"
+                    android:tooltipText="@string/new_project_tip"
+                    app:icon="@drawable/ic_add" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/importModel"
                     style="@style/Widget.G3D.Icon"
                     android:contentDescription="@string/import_model"
@@ -447,6 +454,8 @@
                 <TextView
                     android:id="@+id/projectState"
                     style="@style/Widget.G3D.SectionLabel"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:paddingTop="6dp"
                     android:text="@string/project_title" />
 

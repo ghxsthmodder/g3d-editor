@@ -266,4 +266,10 @@ object Native {
      * report when it worked, "ERROR:" and the reason when it did not.
      */
     external fun nativeOpenProject(data: ByteArray, fileName: String): String
+
+    /**
+     * Throws the open document away and comes back with the example cube the app starts on: scene,
+     * UV session and layer stack together. "OK" and the new scene.
+     */
+    external fun nativeNewProject(): String
 }

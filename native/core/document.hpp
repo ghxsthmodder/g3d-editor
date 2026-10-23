@@ -20,6 +20,9 @@ public:
     // The last successful format and warnings are remembered for the status line.
     bool importModel(const void *data, size_t length, const std::string &hint, std::string &error);
 
+    // Throws the document away and comes back with the example cube, as a fresh start does.
+    void reset();
+
     std::string describe();
     std::string hierarchy();
     bool bounds(float outMin[3], float outMax[3]);

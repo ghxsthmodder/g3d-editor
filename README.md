@@ -97,8 +97,19 @@ a cessão de escrita que o próprio app pediu ao criar o arquivo e com a linha q
 a primeira gravação — ou um provedor que retirara a permissão — ainda abre o seletor, e segurar o
 botão faz o que o toque fazia antes, escolher o arquivo. Uma recusa apaga a memória do caminho, para
 o toque seguinte não bater na mesma porta.
-O app roda no telefone com o layout novo; o salvamento, a leitura via SAF e a lista de recentes
-ainda não foram conferidos um por um no aparelho.
+O painel também diz qual documento está aberto: a linha que acendia **Projeto • não salvo** passa a
+trazer o nome do arquivo — `casa.g3dp`, ou `doghouse.glb` quando o que entrou foi um modelo e ainda
+não há projeto — e com edições soltas vira `casa.g3dp • não salvo`. Nomear é o que faltava para a
+marca dizer *de quê*; um projeto aberto só por cessão de leitura ganha o nome também, porque o nome
+é o que a pessoa abriu, não o que se pode escrever nele. Fechar o documento também passou a ter um
+gesto: o `+` no alto do *rail* joga fora a cena, o modelo embutido e a pilha de camadas de uma vez
+e volta ao cubo de exemplo com que o app abre, pedindo a mesma confirmação de antes — descartar é o
+que aquilo é, e um resto de pilha ou de sessão de UV numerado contra malhas que agora são outras
+seria editado no modelo seguinte. O `reset()` do núcleo está no teste de host dos projetos: a cena
+volta a ter uma malha, `hasSource()` diz falso e gravar é recusado, em vez de escrever um `.g3dp`
+que reabriria o modelo que foi jogado fora.
+O app roda no telefone com o layout novo; o salvamento, a leitura via SAF, a lista de recentes, a
+marca de documento e o `+` de projeto novo ainda não foram conferidos um por um no aparelho.
 
 ## Compilar
 

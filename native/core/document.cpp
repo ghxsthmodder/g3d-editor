@@ -17,6 +17,14 @@ void addOnce(std::vector<uint32_t> &list, uint32_t index) {
     }
 }
 
+// What the document holds before the user brings anything in: the view is never empty, so gestures
+// can be checked before a model is imported.
+Mesh starterMesh() {
+    Mesh cube = makeCube(0.5f);
+    cube.name = "cubo de exemplo";
+    return cube;
+}
+
 }  // namespace
 
 Document &Document::instance() {
@@ -25,11 +33,7 @@ Document &Document::instance() {
 }
 
 Document::Document() {
-    // The editor starts with a cube so the view is never empty and gestures can be checked
-    // before a model is imported. Importing replaces it.
-    Mesh cube = makeCube(0.5f);
-    cube.name = "cubo de exemplo";
-    scene_.add(std::move(cube));
+    scene_.add(starterMesh());
     scene_.select(0);
     lastReport_ = "cena inicial: cubo de exemplo";
 }
@@ -56,6 +60,19 @@ bool Document::importModel(const void *data, size_t length, const std::string &h
     // in a project any more.
     rebuilt_.clear();
     return true;
+}
+
+// Puts the document back to what a fresh start holds. The file the model came in with goes too:
+// a project saved after this would otherwise carry a model the scene no longer shows.
+void Document::reset() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    scene_.clear();
+    scene_.add(starterMesh());
+    scene_.select(0);
+    source_.clear();
+    sourceName_.clear();
+    rebuilt_.clear();
+    lastReport_ = "documento novo: cubo de exemplo";
 }
 
 bool Document::hasSource() const {

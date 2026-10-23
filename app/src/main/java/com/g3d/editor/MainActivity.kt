@@ -78,6 +78,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private var modelName = "modelo"
     private var pendingFormat = FORMAT_GLB
 
+    // The document on screen, named after the file it came from — a model import or a project,
+    // writable or not. Null while the scene holds only the cube the app starts on.
+    private var documentName: String? = null
+
     private lateinit var viewport: ModelView
     private lateinit var inspectorPanel: View
     private lateinit var inspectorTabs: MaterialButtonToggleGroup
@@ -93,6 +97,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var workText: TextView
     private lateinit var workCancel: MaterialButton
     private lateinit var importButton: MaterialButton
+    private lateinit var newButton: MaterialButton
     private lateinit var recentButton: MaterialButton
     private lateinit var projectState: TextView
     private lateinit var saveButton: MaterialButton
@@ -201,6 +206,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         workText = findViewById(R.id.workText)
         workCancel = findViewById(R.id.workCancel)
         importButton = findViewById(R.id.importModel)
+        newButton = findViewById(R.id.projectNew)
         recentButton = findViewById(R.id.projectRecent)
         projectState = findViewById(R.id.projectState)
         frameButton = findViewById(R.id.frameScene)
@@ -231,6 +237,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
         viewport.listener = this
         importButton.setOnClickListener { guardDiscard { openModel.launch(arrayOf("*/*")) } }
+        newButton.setOnClickListener { guardDiscard { startNewProject() } }
         // The visible way out of a run, next to the number it reports. A tap that finds no
         // generation says so instead of pretending it stopped something.
         workCancel.setOnClickListener {
@@ -442,6 +449,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
         if (!Native.isAvailable) {
             importButton.isEnabled = false
+            newButton.isEnabled = false
             frameButton.isEnabled = false
             shadingGroup.isEnabled = false
             viewGroup.isEnabled = false
@@ -1244,20 +1252,44 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
      */
     private fun markDirty() {
         revision++
-        if (dirty) return
+        if (dirty) {
+            return
+        }
         dirty = true
-        projectState.setText(R.string.project_state_dirty)
-        projectState.tooltipText = getString(R.string.project_state_dirty_tip)
-        projectState.setTextColor(getColor(R.color.selection_accent))
+        refreshDocumentLabel()
     }
 
     /** A document that is what a file already holds cannot be lost, so there is nothing to warn. */
     private fun clearDirty() {
-        if (!dirty) return
+        if (!dirty) {
+            return
+        }
         dirty = false
-        projectState.setText(R.string.project_title)
-        projectState.tooltipText = null
-        projectState.setTextColor(getColor(R.color.editor_text_dim))
+        refreshDocumentLabel()
+    }
+
+    /**
+     * The one line that says which document is open and whether it is written down: the file it
+     * came from, and the amber marker while something in it exists only in this run. A project
+     * that came off a read-only grant still gets its name, because the name is what the user
+     * opened.
+     */
+    private fun refreshDocumentLabel() {
+        val name = documentName
+        projectState.text = when {
+            dirty && name != null -> getString(R.string.project_state_dirty_named, name)
+            dirty -> getString(R.string.project_state_dirty)
+            name != null -> name
+            else -> getString(R.string.project_title)
+        }
+        projectState.tooltipText = when {
+            dirty -> getString(R.string.project_state_dirty_tip)
+            name != null -> getString(R.string.project_state_named_tip, name)
+            else -> null
+        }
+        projectState.setTextColor(
+            getColor(if (dirty) R.color.selection_accent else R.color.editor_text_dim)
+        )
     }
 
     /**
@@ -1306,6 +1338,51 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun startProjectSaveAs() {
         if (!projectSaveAllowed()) return
         saveProjectTo.launch(suggestedProjectName())
+    }
+
+    /**
+     * The way out of a document that has no file yet. The scene, the model embedded in it and the
+     * layer stack go in one call: a leftover stack, or a UV session numbered against meshes that
+     * now name a different model, would be edited into whatever comes next.
+     */
+    private fun startNewProject() {
+        if (busy || !Native.isAvailable) return
+        beginWork(getString(R.string.status_project_new))
+        Thread {
+            noteStage("fechando o documento aberto")
+            val reply = Native.nativeNewProject()
+            val opened = reply.startsWith("OK")
+            val message = if (opened) {
+                getString(R.string.status_project_new)
+            } else {
+                getString(
+                    R.string.status_project_new_failed,
+                    reply.removePrefix("ERROR:").trim()
+                )
+            }
+            runOnUiThread {
+                if (opened) {
+                    // The session that was open pointed at the mesh the document just lost.
+                    if (uvOpen) {
+                        Native.nativeUvCancel()
+                        closeUvEditor()
+                    }
+                    modelName = "modelo"
+                    documentName = null
+                    selectedMesh = -1
+                    projectFile = null
+                    dirty = false
+                    refreshDocumentLabel()
+                    viewport.refreshScene()
+                    viewport.frameScene()
+                    refreshHierarchy()
+                    refreshTextureStack()
+                    syncTextureCanvasField()
+                    refreshMemoryLine()
+                }
+                finishWork(message)
+            }
+        }.start()
     }
 
     /** @return whether there is a document to write, saying so where there is none. */
@@ -1376,8 +1453,12 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                 // the editor now points at: the recents list would be behind the truth without it.
                 // The label comes down only if the document is still the one those bytes carried.
                 if (saved) {
-                    recordRecent(uri, displayName(uri), project = true, writable = true)
+                    val shown = displayName(uri)
+                    recordRecent(uri, shown, project = true, writable = true)
                     projectFile = uri
+                    // The file the document was written to is the one its label names, whether or
+                    // not the write grant came along with it.
+                    documentName = shown
                     if (revision == written) clearDirty()
                 } else if (refused && direct) {
                     projectFile = null
@@ -1431,6 +1512,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                         closeUvEditor()
                     }
                     modelName = name.substringBeforeLast('.', name)
+                    documentName = name
                     selectedMesh = -1
                     viewport.refreshScene()
                     viewport.frameScene()
@@ -1689,6 +1771,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                 if (imported) {
                     // The scene was rebuilt, so an open session would apply to the wrong mesh.
                     modelName = openedName
+                    // The label says which file the scene came out of; a model is not a project,
+                    // and the extension on screen is what tells the two apart.
+                    documentName = name
                     if (uvOpen) {
                         Native.nativeUvCancel()
                         closeUvEditor()
@@ -1896,6 +1981,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun beginWork(message: String, stoppable: Boolean = false) {
         busy = true
         importButton.isEnabled = false
+        newButton.isEnabled = false
         recentButton.isEnabled = false
         workRow.visibility = View.VISIBLE
         workCancel.visibility = if (stoppable) View.VISIBLE else View.GONE
@@ -1909,6 +1995,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun finishWork(message: String) {
         busy = false
         importButton.isEnabled = true
+        newButton.isEnabled = true
         recentButton.isEnabled = readRecents().isNotEmpty()
         progressHandler.removeCallbacks(progressTicker)
         workRow.visibility = View.GONE

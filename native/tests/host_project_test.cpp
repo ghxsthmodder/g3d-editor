@@ -310,6 +310,40 @@ void testGeneratedGeometry() {
     studio.reset();
 }
 
+// --- throwing the document away ----------------------------------------------------------------
+// A new project is not an import of nothing: the scene, the file embedded in the document and the
+// compositor all have to go, or the next model inherits the layers of the one before it.
+void testNewProject() {
+    std::string error;
+    g3d::Document &document = g3d::Document::instance();
+    g3d::TextureStudio &studio = g3d::TextureStudio::instance();
+    const std::string scenePath = std::string(G3D_TEST_MODEL_DIR) + "/two-objects.obj";
+    const std::vector<char> sceneBytes = readAll(scenePath);
+    check(document.importModel(sceneBytes.data(), sceneBytes.size(), scenePath, error),
+          "importa o modelo que vai ser jogado fora: " + error);
+    std::string canvasError;
+    studio.setCanvas(32, 32, canvasError);
+    const g3d::Image layer = solid(8, 8, 255, 0, 0, 255, "vermelho");
+    studio.addLayer(layer, canvasError);
+    check(document.hasSource() && studio.layerCount() == 1u,
+          "o documento tem arquivo e compositor");
+
+    document.reset();
+    check(document.meshCount() == 1u, "a cena volta a ter uma malha");
+    check(!document.hasSource(), "e o arquivo que ela veio junto se vai");
+    std::string name;
+    document.withScene([&name](g3d::Scene &scene) { name = scene.meshAt(0)->name; });
+    check(name == "cubo de exemplo", "que é o cubo de sempre: " + name);
+
+    std::vector<uint8_t> bytes;
+    g3d::ProjectReport report;
+    check(!g3d::saveProject(bytes, report, error),
+          "sem modelo embutido não há projeto: " + error);
+
+    studio.reset();
+    check(studio.layerCount() == 0u, "o compositor vazio é outra decisão, e também limpa");
+}
+
 }  // namespace
 
 int main() {
@@ -317,6 +351,7 @@ int main() {
     testContainer();
     testSaveAndOpen();
     testGeneratedGeometry();
+    testNewProject();
     std::printf("\n%d verificacoes, %d falhas\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

@@ -888,4 +888,16 @@ JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeOpenProject(JNIEnv *e
     }));
 }
 
+// The document the user abandons on purpose. Everything the previous one held goes with it, because
+// a leftover layer stack or a UV session pointing at a mesh index that now means another mesh would
+// be edited into the next model imported here.
+JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeNewProject(JNIEnv *env, jclass) {
+    return toJString(env, guardText("criar um projeto", [&] {
+        g3d::UvEditor::instance().cancel();
+        g3d::Document::instance().reset();
+        g3d::TextureStudio::instance().reset();
+        return std::string("OK\n") + g3d::Document::instance().describe();
+    }));
+}
+
 }  // extern "C"

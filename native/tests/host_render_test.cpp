@@ -453,6 +453,12 @@ int main() {
     check(wideFirst - atlasMargin >= 200,
           "o modelo recebe a largura que o quadrado nao usa, colunas=" +
               std::to_string(wideFirst - atlasMargin));
+    // To the pixel: past the surface height the square cannot grow, so the columns beyond it belong
+    // to the model. The cap the renderer applies is the height itself, not the height divided by
+    // the atlas's own margin, which hands the panel a band no island is ever drawn in.
+    check(wideFirst - atlasMargin >= 640 - 360,
+          "o painel do atlas nao passa da altura, o resto e do modelo, colunas=" +
+              std::to_string(wideFirst - atlasMargin));
     float modelUv[2] = {-1.0f, -1.0f};
     check(!renderer.uvAt(50.0f, 180.0f, modelUv), "a esquerda continua sendo o modelo");
     renderer.onSurfaceChanged(kSize, kSize);

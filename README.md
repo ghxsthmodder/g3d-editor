@@ -34,8 +34,9 @@ medido pelo menor dos dois: a coluna gasta 216 dp de largura, o lado que sobra, 
 atlas mede ~372 dp de lado com as ferramentas abertas ou fechadas; uma gaveta na beirada de baixo
 gastaria 210 dp da altura e deixaria o atlas com 151 dp (aritmética de tela, ainda não conferida no
 aparelho) —, atlas dominante quando a edição é dele, a superfície dividida pelo seu lado curto —
-e no deitado o painel do atlas recebe no máximo o que um quadrado consegue usar, a sobra voltando
-para o modelo em vez de virar tarja vazia ao lado das ilhas — e arrastar com um dedo move as ilhas
+e no deitado o painel do atlas recebe no máximo a própria altura, que é o lado com que um quadrado
+cresce — a sobra voltando para o modelo em vez de virar tarja vazia ao lado das ilhas (a tarja media
+~9% da altura antes disto) — e arrastar com um dedo move as ilhas
 selecionadas. A seleção aceita pino: a ilha bloqueada continua destacada para poder ser destravada,
 mas nenhuma ferramenta a alcança, um arrasto cujo grupo inteiro está pinado é recusado e o dedo
 volta para a câmera, e o reempacotamento contorna a caixa que ela ocupa em vez de soterrá-la — o

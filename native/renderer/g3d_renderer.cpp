@@ -648,14 +648,15 @@ void Renderer::rectOf(int part, int out[4]) const {
     const bool stacked = surfaceHeight > surfaceWidth;
     const int split = static_cast<int>(
         static_cast<float>(stacked ? surfaceHeight : surfaceWidth) * ratio);
-    // The atlas is a square measured by the short side of its panel, so a panel longer than that
-    // side divided by the margin carries bands no island is ever drawn in. The atlas does not want
-    // those pixels and the model draws whatever shape it is given, so the surplus goes to the model
-    // and the atlas keeps the edge it was asked for.
+    // The atlas is a square measured by the short side of its panel, so a panel wider than it is
+    // tall carries bands no island is ever drawn in. The atlas does not want those pixels and the
+    // model draws whatever shape it is given, so the surplus goes to the model and the atlas keeps
+    // the edge it was asked for. That edge is the short side itself: the margin the square leaves
+    // inside its panel is breathing room applied to what it already has, not a reason to hand the
+    // panel more columns than the square can reach.
     const int along = stacked ? surfaceHeight : surfaceWidth;
     const int across = stacked ? surfaceWidth : surfaceHeight;
-    const int useful = std::min(
-        static_cast<int>(static_cast<float>(across) / kAtlasMarginRatio) + 1, along - 1);
+    const int useful = std::min(across, along - 1);
     const int atlasSpan = std::min(useful, std::max(along - split, 1));
     if (part == 0) {
         if (mode == kViewAtlasOnly) {

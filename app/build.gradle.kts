@@ -43,6 +43,20 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildTypes {
+        getByName("debug") {
+            // The native half of a debug APK is built the way the release APK builds it. Assimp's
+            // glTF importer runs a probe that trips an assertion inside vendored RapidJSON, and an
+            // assertion calls abort(): on the phone that is the editor closing on a file it can
+            // read. RelWithDebInfo keeps the -g symbols a fault is read with and leaves NDEBUG on.
+            externalNativeBuild {
+                cmake {
+                    arguments += "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+                }
+            }
+        }
+    }
+
     kotlinOptions {
         jvmTarget = "17"
     }

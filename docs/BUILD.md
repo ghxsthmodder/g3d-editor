@@ -42,12 +42,12 @@ Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembl
 dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
 não é necessário.
 
-Medidas do último *build* de depuração: `app-debug.apk` de 18.700.931 bytes (17,8 MiB), com
-`libg3dnative.so` despojado de 5.204.648 bytes (arm64-v8a) e 5.045.872 bytes (x86_64), os dois
-empacotados sem compressão. O módulo de projeto traz o RapidJSON que já vinha com o
-Assimp (cabeçalhos, instanciados onde o projeto é escrito e lido), e é dele boa parte desse aumento.
-É Debug com símbolos parciais, não Release: o número serve para acompanhar a tendência quando algo é
-incorporado, não como tamanho de distribuição. A forma de distribuição é menor:
+Medidas do último *build* de depuração: `app-debug.apk` de 14.527.931 bytes (13,9 MiB), com
+`libg3dnative.so` despojado de 2.979.752 bytes (arm64-v8a) e 3.101.096 bytes (x86_64), os dois
+empacotados sem compressão — exatamente os mesmos números do APK de distribuição, porque a metade
+nativa agora é compilada da mesma maneira nos dois (ver *O tipo de compilação nativo* abaixo). O
+módulo de projeto traz o RapidJSON que já vinha com o Assimp (cabeçalhos, instanciados onde o
+projeto é escrito e lido). A forma de distribuição:
 `assembleRelease` produz `app-release-unsigned.apk` de 11.418.441 bytes (10,9 MiB), com o
 `libg3dnative.so` despojado de 2.979.752 bytes (arm64-v8a) e 3.101.096 bytes (x86_64). É o APK sem
 assinatura: o bloco `META-INF` que a assinatura acrescenta não foi medido. Os exportadores de OBJ e
@@ -65,6 +65,36 @@ cmp /tmp/apkx/assets/licenses/xatlas.txt third_party/xatlas/LICENSE
 
 O `.so` não mudou com nada disto: a tela de licenças e a lista de recentes são Kotlin e recursos, e
 a ponte não ganhou chamada nenhuma — a paridade segue 71 de cada lado.
+
+## O tipo de compilação nativo
+
+O Gradle escolhe o `CMAKE_BUILD_TYPE` pela variante: `Debug` para o APK de depuração e
+`RelWithDebInfo` para o de distribuição. Aqui isso não é troca de gosto — é a diferença entre o app
+fechar ou não nas mãos de quem usa. Com as asserções vivas, a importação de **qualquer** glTF ou GLB
+aborta dentro do RapidJSON vendorizado: a sonda que o importador glTF do Assimp faz antes de ler
+(`glTF2Importer::CanRead` → `Asset::CanRead` → `AssetMetadata::Read`) cai no `FindMember` de
+`document.h`, e a exportação em glTF cai do mesmo modo. Um OBJ não passa por ali. Uma asserção que
+falha chama `abort()`, e no telefone `abort()` é o editor fechando sem dizer nada — foi assim que
+ele se fechou ao abrir a `doghouse.glb`.
+
+Por isso `app/build.gradle.kts` pede `-DCMAKE_BUILD_TYPE=RelWithDebInfo` para a variante `debug`: a
+metade nativa do APK de depuração passa a ser a mesma que a do APK testado em distribuição. O
+`-g` fica, então uma falha continua legível; o que sai são as asserções. As do próprio editor
+seguem vivas onde elas servem, no *build* de host em Debug.
+
+```bash
+# que configuração entrou realmente no APK de depuração
+grep -m1 "^CMAKE_BUILD_TYPE" app/.cxx/RelWithDebInfo/*/arm64-v8a/CMakeCache.txt
+# os nove testes do host, nos três tipos
+for t in Debug RelWithDebInfo Release; do
+  G3D_HOST_BUILD_TYPE=$t bash native/tests/run_host_test.sh
+done
+```
+
+Os três tipos passam os nove testes, e nenhum deles reproduz a queda: ela dependia de qual cópia
+embutida do `FindMember` o ligador guardava no binário, e é justamente por não se poder escolher
+isso no telefone que a asserção vendorizada não pode continuar ali. O que falta conferir no aparelho
+é se a `doghouse.glb` abre até o fim.
 
 ## Conferir a ponte JNI
 

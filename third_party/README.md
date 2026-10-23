@@ -129,6 +129,11 @@ lista de licenças a reproduzir precisa ser refeita sobre o `.so` — não sobre
 - Como entra: `native/CMakeLists.txt` adiciona `contrib/rapidjson/include` a `G3D_INCLUDES`, e
   `native/project/project_io.cpp` é a única unidade nossa que o usa. Nenhum código do Assimp é
   chamado para isto; a cópia é apenas o cabeçalho já versionado aqui.
+- Comportamento que importa: as asserções de `document.h` são `assert()` comuns, e `assert()` que
+  falha chama `abort()` — num app, é a janela fechando sem mensagem. É o que acontece ao sondar um
+  glTF no importador do Assimp quando a compilação mantém asserções vivas; a saída foi a metade
+  nativa do APK de depuração ser compilada como a de distribuição, descrito em `docs/BUILD.md`.
+  Nenhum cabeçalho foi editado para isso.
 
 ## Material Components for Android
 

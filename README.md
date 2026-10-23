@@ -5,8 +5,12 @@ texturas por camadas. Veja o [PLAN.md](PLAN.md) para objetivos, escopo e fases.
 
 **Estado:** Fase 5 concluída. O fluxo completo existe — importar o modelo, gerar e editar os UVs,
 compor a textura, salvar o projeto em arquivo e reabri-lo. O app rodou no telefone, e foi ao abrir um
-glb de teste que ele apareceu fechado: nada limitava a cena que um arquivo descreve com poucas
-palavras, e o assunto está tratado nos limites abaixo.
+glb de teste que ele apareceu fechado. A queda foi reproduzida aqui e não era a cena sem limite: com
+as asserções vivas — a configuração em que o APK de depuração era compilado —, a sonda que o
+importador glTF do Assimp faz antes de ler cai numa asserção do RapidJSON vendorizado, e uma
+asserção que falha chama `abort()` — no telefone, o editor fechando sem dizer nada. A metade
+nativa do APK de depuração passou a ser compilada como a do APK de distribuição; os limites abaixo
+seguem valendo, porque são outra coisa. Falta conferir no aparelho se a glb abre até o fim.
 A geração e a edição de UVs com xatlas (Fases 2 e 3) e o compositor de
 texturas (Fase 4) — importação de PNG/JPEG, pilha de camadas com posição, rotação, escala, opacidade
 e visibilidade, cor de fundo, prévia da composição no modelo e no atlas, modo quadriculado de

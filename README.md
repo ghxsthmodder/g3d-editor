@@ -50,8 +50,16 @@ falhou — e a faixa some com o trabalho, sem gastar um dp do modelo. Importar t
 está — lendo o arquivo, arrumando a malha, montando a cena —, cada uma com o seu número, mas não tem
 botão de interromper: o Assimp desta tag reporta e deita fora a resposta, de modo que um pedido de
 parada não teria a quem chegar, e um botão morto durante a maior parte da espera seria um botão que
-mente. O que o núcleo pode parar, ele para. O comportamento do núcleo é
-comprovado pelos nove testes do host
+mente. O que o núcleo pode parar, ele para. O painel de geração entrega as **oito** regras que o
+xatlas aceita, e não mais duas: além de margem e resolução, **Opções do xatlas** abre uma caixa com
+busca exaustiva, girar ilhas, corrigir orientação, custo máximo, peso de costura e área máxima —
+fechada por padrão, para não gastar altura que o modelo e o atlas usam. Cada uma faz o que diz, e o
+número foi medido antes de o controle existir: na casa de teste, o atlas ocupado passa de 84 para 96
+por cento com a busca exaustiva, que leva 3,6 s em vez de 0,14 s; um peso de costura acima de 1000
+corta o canelado de 48 facetas em 24 ilhas em vez de 5; um custo máximo de 0,05 faz o mesmo. O que a
+biblioteca faz com cada opção é o que o teste `uv_options_test` confere, e o que ela faz com a
+geração inteira são os demais. O comportamento do núcleo é
+comprovado pelos dez testes do host
 (`bash native/tests/run_host_test.sh`), inclusive o renderizador headless, a ida e volta dos três
 formatos de modelo, o desfazer/refazer e a reabertura de um projeto salvo. A fase também tratou dos
 limites: a **tela do compositor não passa do `GL_MAX_TEXTURE_SIZE`** que o driver informou (as

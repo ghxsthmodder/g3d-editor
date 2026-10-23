@@ -100,6 +100,10 @@ else()
         PRIVATE G3D_TEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/models")
     add_test(NAME uv_islands_test COMMAND host_uv_test)
 
+    add_executable(host_uv_options_test tests/host_uv_options_test.cpp)
+    target_link_libraries(host_uv_options_test PRIVATE g3dcore)
+    add_test(NAME uv_options_test COMMAND host_uv_options_test)
+
     add_executable(host_export_test tests/host_export_test.cpp)
     target_link_libraries(host_export_test PRIVATE g3dcore)
     target_compile_definitions(host_export_test

@@ -87,6 +87,13 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var uvStatusText: TextView
     private lateinit var uvPaddingField: EditText
     private lateinit var uvResolutionField: EditText
+    private lateinit var uvOptionsGroup: View
+    private lateinit var uvBruteForceCheck: CheckBox
+    private lateinit var uvRotateChartsCheck: CheckBox
+    private lateinit var uvFixWindingCheck: CheckBox
+    private lateinit var uvMaxCostField: EditText
+    private lateinit var uvSeamWeightField: EditText
+    private lateinit var uvMaxAreaField: EditText
     private lateinit var uvAdditiveCheck: CheckBox
     private lateinit var texturePanel: View
     private lateinit var textureList: LinearLayout
@@ -180,6 +187,13 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         uvStatusText = findViewById(R.id.uvStatus)
         uvPaddingField = findViewById(R.id.uvPadding)
         uvResolutionField = findViewById(R.id.uvResolution)
+        uvOptionsGroup = findViewById(R.id.uvOptionsGroup)
+        uvBruteForceCheck = findViewById(R.id.uvBruteForce)
+        uvRotateChartsCheck = findViewById(R.id.uvRotateCharts)
+        uvFixWindingCheck = findViewById(R.id.uvFixWinding)
+        uvMaxCostField = findViewById(R.id.uvMaxCost)
+        uvSeamWeightField = findViewById(R.id.uvSeamWeight)
+        uvMaxAreaField = findViewById(R.id.uvMaxArea)
         uvAdditiveCheck = findViewById(R.id.uvAdditive)
         texturePanel = findViewById(R.id.texturePanel)
         textureList = findViewById(R.id.textureList)
@@ -287,6 +301,16 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     )
                 )
             }
+        }
+        // The rules xatlas follows beyond a margin and a size are behind this row. Opening them
+        // changes nothing on its own: what is set only reaches the library on the next Gerar UV.
+        val optionsToggle = findViewById<MaterialButton>(R.id.uvOptionsToggle)
+        optionsToggle.setOnClickListener {
+            val opening = uvOptionsGroup.visibility != View.VISIBLE
+            uvOptionsGroup.visibility = if (opening) View.VISIBLE else View.GONE
+            optionsToggle.setText(
+                if (opening) R.string.uv_options_toggle_open else R.string.uv_options_toggle
+            )
         }
         findViewById<View>(R.id.uvGenerate).setOnClickListener { generateUv() }
         findViewById<View>(R.id.uvSelectAll).setOnClickListener {
@@ -530,6 +554,45 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
     // --- editor UV -----------------------------------------------------------------------
 
+    /**
+     * Every rule the panel hands xatlas. The margin and the size are read by whoever calls, since
+     * only that caller knows whether an empty field is a default or a mistake; the rest are taken
+     * here, so a generation cannot mix a switch moved after the tap with one moved before it.
+     */
+    private data class UvRequest(
+        val padding: Int,
+        val resolution: Int,
+        val maxCost: Float,
+        val maxChartArea: Float,
+        val normalSeamWeight: Float,
+        val bruteForce: Boolean,
+        val rotateCharts: Boolean,
+        val fixWinding: Boolean
+    )
+
+    private fun uvRequest(padding: Int, resolution: Int): UvRequest = UvRequest(
+        padding,
+        resolution,
+        numberField(uvMaxCostField),
+        numberField(uvMaxAreaField),
+        numberField(uvSeamWeightField),
+        uvBruteForceCheck.isChecked,
+        uvRotateChartsCheck.isChecked,
+        uvFixWindingCheck.isChecked
+    )
+
+    private fun sendUvRequest(mesh: Int, request: UvRequest): String = Native.nativeUvGenerate(
+        mesh,
+        request.padding,
+        request.resolution,
+        request.maxCost,
+        request.maxChartArea,
+        request.normalSeamWeight,
+        request.bruteForce,
+        request.rotateCharts,
+        request.fixWinding
+    )
+
     private fun openUvEditor() {
         if (busy || !Native.isAvailable) return
         if (uvOpen) {
@@ -541,8 +604,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             return
         }
         val mesh = selectedMesh
-        val padding = integerField(uvPaddingField, 2)
-        val resolution = integerField(uvResolutionField, 0)
+        val request = uvRequest(
+            integerField(uvPaddingField, 2),
+            integerField(uvResolutionField, 0)
+        )
         // The tap that opens the editor also generates a layout when the mesh has none, so the run
         // this starts may be the one the interrupt button is about.
         beginWork(getString(R.string.status_uv_opening, mesh), stoppable = true)
@@ -551,7 +616,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             // editor also generates the layout it is about to show.
             val opened = Native.nativeUvBegin(mesh)
             val fromScratch = opened.startsWith("ERROR:")
-            val reply = if (fromScratch) Native.nativeUvGenerate(mesh, padding, resolution) else opened
+            val reply = if (fromScratch) sendUvRequest(mesh, request) else opened
             runOnUiThread {
                 if (reply.startsWith("ERROR:")) {
                     finishWork(
@@ -588,11 +653,29 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             report(getString(R.string.status_uv_bad_number))
             return
         }
-        beginWork(getString(R.string.status_uv_generating, padding, resolution), stoppable = true)
+        val maxCost = numberField(uvMaxCostField)
+        val maxArea = numberField(uvMaxAreaField)
+        val seamWeight = numberField(uvSeamWeightField)
+        if (!inRange(maxCost, 0.01f, 1000f) || !inRange(seamWeight, 0f, 100000f) ||
+            !(maxArea == 0f || inRange(maxArea, 0.0001f, 1f))
+        ) {
+            report(getString(R.string.status_uv_bad_options))
+            return
+        }
+        val request = uvRequest(padding, resolution)
+        beginWork(
+            getString(
+                if (request.bruteForce) R.string.status_uv_generating_brute
+                else R.string.status_uv_generating,
+                padding,
+                resolution
+            ),
+            stoppable = true
+        )
         val startedAt = System.currentTimeMillis()
         Thread {
             noteStage("gerando os UVs")
-            val reply = Native.nativeUvGenerate(uvMesh, padding, resolution)
+            val reply = sendUvRequest(uvMesh, request)
             val elapsed = System.currentTimeMillis() - startedAt
             runOnUiThread {
                 if (reply.startsWith("ERROR:")) {
@@ -712,6 +795,17 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
 
     private fun integerField(field: EditText, fallback: Int): Int =
         field.text.toString().trim().toIntOrNull() ?: fallback
+
+    /**
+     * A number as written, NaN when the field holds nothing readable. The comma a Portuguese
+     * keyboard puts between the digits is read as a decimal point, and a field left blank is not
+     * read as zero: for two of the three limits zero is a rule of its own.
+     */
+    private fun numberField(field: EditText): Float =
+        field.text.toString().trim().replace(',', '.').toFloatOrNull() ?: Float.NaN
+
+    private fun inRange(value: Float, minimum: Float, maximum: Float): Boolean =
+        !value.isNaN() && value >= minimum && value <= maximum
 
     override fun onIslandPicked(island: Int, additive: Boolean) {
         if (!uvOpen) return

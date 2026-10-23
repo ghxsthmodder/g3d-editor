@@ -77,7 +77,23 @@ object Native {
 
     external fun nativeUvBegin(meshIndex: Int): String
 
-    external fun nativeUvGenerate(meshIndex: Int, padding: Int, resolution: Int): String
+    /**
+     * One generation over the whole xatlas option set the editor exposes: [padding] in texels,
+     * [resolution] in pixels (0 lets xatlas size the atlas), [maxCost] and [maxChartArea] and
+     * [normalSeamWeight] as the chart rules, and the three switches [bruteForce], [rotateCharts]
+     * and [fixWinding]. A value the native side cannot use falls back to what xatlas defaults to.
+     */
+    external fun nativeUvGenerate(
+        meshIndex: Int,
+        padding: Int,
+        resolution: Int,
+        maxCost: Float,
+        maxChartArea: Float,
+        normalSeamWeight: Float,
+        bruteForce: Boolean,
+        rotateCharts: Boolean,
+        fixWinding: Boolean
+    ): String
 
     /**
      * What the generation under way has to show: an empty string while nothing is running, and

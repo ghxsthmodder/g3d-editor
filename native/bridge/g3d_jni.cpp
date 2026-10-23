@@ -4,6 +4,7 @@
 #include <jni.h>
 #include <android/log.h>
 
+#include <cmath>
 #include <exception>
 #include <limits>
 #include <sstream>
@@ -55,6 +56,16 @@ std::string uvRangeReport(const g3d::UvResult &result) {
 
 jstring toJString(JNIEnv *env, const std::string &text) {
     return env->NewStringUTF(text.c_str());
+}
+
+// A limit typed into a text field can be blank, a word, or a negative number, and xatlas reads any
+// of those as a chart rule rather than as no rule. The option's own default is what the field shows
+// and is what the value falls back to.
+float saneLimit(jfloat value, float fallback) {
+    if (!std::isfinite(value) || value < 0.0f) {
+        return fallback;
+    }
+    return static_cast<float>(value);
 }
 
 // Every compositor mutator answers with the same summary line, so the panel never has to guess
@@ -354,11 +365,26 @@ JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeUvBegin(JNIEnv *env, 
 
 JNIEXPORT jstring JNICALL Java_com_g3d_editor_Native_nativeUvGenerate(JNIEnv *env, jclass,
                                                                       jint index, jint padding,
-                                                                      jint resolution) {
+                                                                      jint resolution,
+                                                                      jfloat maxCost,
+                                                                      jfloat maxChartArea,
+                                                                      jfloat normalSeamWeight,
+                                                                      jboolean bruteForce,
+                                                                      jboolean rotateCharts,
+                                                                      jboolean fixWinding) {
     return toJString(env, guardText("gerar os UVs", [&] {
         g3d::UvOptions options;
         options.padding = padding > 0 ? static_cast<uint32_t>(padding) : 2u;
         options.resolution = resolution > 0 ? static_cast<uint32_t>(resolution) : 0u;
+        // The two above are whole numbers the panel range-checked before sending; these three come
+        // from text fields, so a blank or a nonsense value can arrive. A non-number and a negative
+        // limit both become what xatlas itself would have used, which is what the field shows.
+        options.maxCost = saneLimit(maxCost, options.maxCost);
+        options.maxChartArea = saneLimit(maxChartArea, options.maxChartArea);
+        options.normalSeamWeight = saneLimit(normalSeamWeight, options.normalSeamWeight);
+        options.bruteForce = bruteForce == JNI_TRUE;
+        options.rotateCharts = rotateCharts == JNI_TRUE;
+        options.fixWinding = fixWinding == JNI_TRUE;
 
         std::string error;
         if (!g3d::UvEditor::instance().generate(

@@ -621,6 +621,103 @@
                         android:text="4096" />
                 </LinearLayout>
 
+                <!-- What xatlas is asked for is more than a margin and a size: six rules decide how
+                     the mesh is cut into islands and how tightly they pack, and the panel was
+                     handing the library's own defaults for all six without saying so. They stay
+                     behind one row, because always on screen they would double the height of a
+                     panel that is 204dp wide. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/uvOptionsToggle"
+                    style="@style/ToolButton.Outlined"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/uv_options_toggle"
+                    android:textSize="11sp" />
+
+                <LinearLayout
+                    android:id="@+id/uvOptionsGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <CheckBox
+                        android:id="@+id/uvBruteForce"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/uv_brute_force"
+                        android:textColor="@color/editor_text"
+                        android:textSize="12sp"
+                        android:tooltipText="@string/uv_brute_force_hint" />
+
+                    <CheckBox
+                        android:id="@+id/uvRotateCharts"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="@string/uv_rotate_charts"
+                        android:textColor="@color/editor_text"
+                        android:textSize="12sp"
+                        android:tooltipText="@string/uv_rotate_charts_hint" />
+
+                    <CheckBox
+                        android:id="@+id/uvFixWinding"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/uv_fix_winding"
+                        android:textColor="@color/editor_text"
+                        android:textSize="12sp"
+                        android:tooltipText="@string/uv_fix_winding_hint" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <EditText
+                            android:id="@+id/uvMaxCost"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:autofillHints="none"
+                            android:hint="@string/uv_max_cost_hint"
+                            android:inputType="numberDecimal"
+                            android:maxLength="6"
+                            android:text="@string/uv_max_cost_default"
+                            android:textSize="12sp"
+                            android:tooltipText="@string/uv_max_cost_tip" />
+
+                        <EditText
+                            android:id="@+id/uvSeamWeight"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:autofillHints="none"
+                            android:hint="@string/uv_seam_weight_hint"
+                            android:inputType="numberDecimal"
+                            android:maxLength="6"
+                            android:text="@string/uv_seam_weight_default"
+                            android:textSize="12sp"
+                            android:tooltipText="@string/uv_seam_weight_tip" />
+
+                        <EditText
+                            android:id="@+id/uvMaxArea"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:autofillHints="none"
+                            android:hint="@string/uv_max_area_hint"
+                            android:inputType="numberDecimal"
+                            android:maxLength="6"
+                            android:text="@string/uv_max_area_default"
+                            android:textSize="12sp"
+                            android:tooltipText="@string/uv_max_area_tip" />
+                    </LinearLayout>
+                </LinearLayout>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

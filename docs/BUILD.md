@@ -42,14 +42,15 @@ Neste ambiente o Gradle é chamado com `--offline` (`./gradlew --offline assembl
 dependências já estão no cache local (`~/.gradle`) e não há rede. Fora de sandbox, o `--offline`
 não é necessário.
 
-Medidas do último *build* de depuração: `app-debug.apk` de 14.527.803 bytes (13,9 MiB), com
-`libg3dnative.so` despojado de 2.979.544 bytes (arm64-v8a) e 3.100.968 bytes (x86_64), os dois
-empacotados sem compressão — byte por byte os mesmos `.so` do APK de distribuição, porque a metade
-nativa agora é compilada da mesma maneira nos dois (ver *O tipo de compilação nativo* abaixo). O
-módulo de projeto traz o RapidJSON que já vinha com o Assimp (cabeçalhos, instanciados onde o
-projeto é escrito e lido). A forma de distribuição:
-`assembleRelease` produz `app-release-unsigned.apk` de 11.418.313 bytes (10,9 MiB), com o mesmo
-`libg3dnative.so` de 2.979.544 bytes (arm64-v8a) e 3.100.968 bytes (x86_64). É o APK sem
+Medidas do último *build* de depuração: `app-debug.apk` de 14.528.043 bytes (13,9 MiB), com
+`libg3dnative.so` despojado de 2.979.720 bytes (arm64-v8a) e 3.101.208 bytes (x86_64), os dois
+empacotados sem compressão — os mesmos tamanhos e o mesmo `CMAKE_BUILD_TYPE` do APK de distribuição,
+porque a metade nativa agora é compilada da mesma maneira nos dois (ver *O tipo de compilação
+nativo* abaixo); extraídos dos dois APKs, os `.so` de cada ABI diferem em 20 bytes, que é o
+*build ID* e o que o cerca. O módulo de projeto traz o RapidJSON que já vinha com o Assimp
+(cabeçalhos, instanciados onde o projeto é escrito e lido). A forma de distribuição:
+`assembleRelease` produz `app-release-unsigned.apk` de 11.427.733 bytes (10,9 MiB), com o mesmo
+`libg3dnative.so` de 2.979.720 bytes (arm64-v8a) e 3.101.208 bytes (x86_64). É o APK sem
 assinatura: o bloco `META-INF` que a assinatura acrescenta não foi medido. Os exportadores de OBJ e
 glTF do Assimp, ligados nesta contagem, custam cerca de 100 KB por ABI. Os glifos vetoriais da
 interface são 29 arquivos XML que somam 13.927 bytes de fonte; no APK eles entram no bloco de
@@ -85,16 +86,16 @@ seguem vivas onde elas servem, no *build* de host em Debug.
 ```bash
 # que configuração entrou realmente no APK de depuração
 grep -m1 "^CMAKE_BUILD_TYPE" app/.cxx/RelWithDebInfo/*/arm64-v8a/CMakeCache.txt
-# os nove testes do host, nos três tipos
+# os dez testes do host, nos três tipos
 for t in Debug RelWithDebInfo Release; do
   G3D_HOST_BUILD_TYPE=$t bash native/tests/run_host_test.sh
 done
 ```
 
-Os três tipos passam os nove testes, e nenhum deles reproduz a queda: ela dependia de qual cópia
+Os três tipos passam os dez testes, e nenhum deles reproduz a queda: ela dependia de qual cópia
 embutida do `FindMember` o ligador guardava no binário, e é justamente por não se poder escolher
-isso no telefone que a asserção vendorizada não pode continuar ali. O que falta conferir no aparelho
-é se a `doghouse.glb` abre até o fim.
+isso no telefone que a asserção vendorizada não pode continuar ali. A `doghouse.glb` abre até o fim
+no aparelho.
 
 ## Conferir a ponte JNI
 
@@ -119,12 +120,13 @@ Sem saída, os dois lados batem. São 71 funções declaradas e 71 exportadas ne
 bash native/tests/run_host_test.sh
 ```
 
-O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os nove testes via
+O script configura `native/CMakeLists.txt` para o compilador do sistema e roda os dez testes via
 CTest (nenhum deles faz parte do APK):
 
 | Teste | Executável | O que verifica |
 | --- | --- | --- |
 | `uv_smoke_test` | `host_smoke_test` | geração de UV com xatlas a partir de geometria sintética, o relatório de progresso que a biblioteca preenche enquanto roda — etapa, porcentagem, o cancelamento pedido no meio de uma geração de verdade e o que ele devolve — e o que fica de fora do relatório quando o trabalho termina |
+| `uv_options_test` | `host_uv_options_test` | as oito opções de UV que o painel oferece, cada uma medida contra o que o xatlas faz: um canelado de 48 facetas em que o peso de costura, o custo máximo e a área máxima mudam o recorte, e uma caixa com um triângulo em três virado ao contrário em que corrigir a orientação devolve ilhas no sentido certo. Toda combinação ainda tem de sair malha válida, UV dentro do atlas e uma ilha por triângulo |
 | `import_test` | `host_import_test` | importação de OBJ/glTF/GLB (`native/tests/models`) e estado do documento, inclusive as referências repetidas de um mesmo glTF unidas no lugar, o orçamento de memória que para a cena e diz quantas partes ficaram de fora, os nomes com bytes fora do UTF-8 que o telefone recusaria, e o relatório de progresso da importação — as três fases por que todo arquivo passa, o número dentro de cada uma, o que fica registrado depois que a corrida acaba e o que uma recusa antes de começar não muda |
 | `uv_islands_test` | `host_uv_test` | agrupamento de UVs em ilhas e conectividade |
 | `uv_edit_test` | `host_uv_edit_test` | sessão de edição: seleção, transformações, reempacotamento, o pino que tira a ilha do alcance das ferramentas e que o reempacotamento contorna, validar, aplicar/cancelar, o desfazer/refazer, inclusive o arrasto inteiro num passo, o progresso que a sessão publicada devolve quando não há geração alguma — vazio, e um cancelar que não encontra nada — e a memória que a sessão aberta retém |

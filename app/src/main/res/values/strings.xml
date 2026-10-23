@@ -78,6 +78,23 @@
     <string name="uv_resolution_hint">resolução</string>
     <string name="uv_resolution_default">1024</string>
     <string name="uv_generate">Gerar UV</string>
+    <string name="uv_options_toggle">Opções do xatlas ▾</string>
+    <string name="uv_options_toggle_open">Opções do xatlas ▴</string>
+    <string name="uv_brute_force">Busca exaustiva</string>
+    <string name="uv_brute_force_hint">Testa mais combinações de empacotamento: o atlas fica melhor aproveitado e a geração demora mais. Na casa de teste o atlas ocupado passa de 84 para 96 por cento e o tempo vai de 0,1 s para 3,6 s.</string>
+    <string name="uv_rotate_charts">Girar ilhas</string>
+    <string name="uv_rotate_charts_hint">Deixa o xatlas girar cada ilha para ela caber melhor no atlas. Desligado sobra mais atlas vazio.</string>
+    <string name="uv_fix_winding">Corrigir orientação</string>
+    <string name="uv_fix_winding_hint">Vira a ilha cuja ordem dos vértices saiu invertida, para a textura não entrar espelhada.</string>
+    <string name="uv_max_cost_hint">custo máx</string>
+    <string name="uv_max_cost_default">2</string>
+    <string name="uv_max_cost_tip">Quanto a ilha pode se esticar antes de ser cortada. Número menor corta em mais ilhas.</string>
+    <string name="uv_seam_weight_hint">costura</string>
+    <string name="uv_seam_weight_default">4</string>
+    <string name="uv_seam_weight_tip">Peso das costuras de normal ao crescer uma ilha. Zero as ignora; acima de 1000 elas são respeitadas sempre.</string>
+    <string name="uv_max_area_hint">área máx</string>
+    <string name="uv_max_area_default">0</string>
+    <string name="uv_max_area_tip">Área máxima de uma ilha, em fração da superfície. Zero não limita; um valor pequeno divide as faces grandes.</string>
     <string name="uv_select_all">Tudo</string>
     <string name="uv_select_none">Nada</string>
     <string name="uv_additive">Somar ao tocar</string>
@@ -118,6 +135,7 @@
     <string name="status_uv_generated_open">a malha não tinha UVs: gerados para editar, malha %1$d</string>
     <string name="status_uv_open_failed">não foi possível abrir o editor UV: %1$s</string>
     <string name="status_uv_generating">gerando UVs (margem %1$d texels, resolução %2$d px) …</string>
+    <string name="status_uv_generating_brute">gerando UVs (margem %1$d texels, resolução %2$d px) com busca exaustiva, vai demorar mais …</string>
     <string name="status_uv_generated">pré-visualização pronta em %1$d ms</string>
     <string name="status_uv_generate_failed">a geração de UV falhou: %1$s</string>
     <string name="status_uv_applying">aplicando os UVs à malha …</string>
@@ -135,6 +153,7 @@
     <string name="status_uv_additive_on">toque soma ilhas à seleção</string>
     <string name="status_uv_additive_off">toque substitui a seleção</string>
     <string name="status_uv_bad_number">margem entre 1 e 9999 texels; resolução 0 (automática) ou entre 1 e 8192</string>
+    <string name="status_uv_bad_options">custo máximo entre 0,01 e 1000; peso de costura entre 0 e 100000; área máxima 0 (sem limite) ou entre 0,0001 e 1</string>
 
 
     <string name="texture_title">Texturas</string>

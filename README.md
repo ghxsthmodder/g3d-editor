@@ -88,7 +88,12 @@ A marca se apaga quando o `.g3dp` é gravado ou lido e quando um modelo entra li
 se algo mudar durante a gravação, ela fica acesa, porque aquele pedaço não entrou no arquivo. Os
 quatro controles do compositor que mexiam na pilha sem olhar se o editor estava ocupado — canvas,
 fundo, visível e opacidade — agora obedecem ao mesmo `busy` das outras ferramentas, e reescrever uma
-camada enquanto o projeto está sendo gravado deixou de ser possível.
+camada enquanto o projeto está sendo gravado deixou de ser possível. Gravar também deixou de ser uma
+ida à pasta: o `Salvar` lembra o arquivo em que o documento foi escrito e volta a escrever nele, com
+a cessão de escrita que o próprio app pediu ao criar o arquivo e com a linha que `Recentes` guarda;
+a primeira gravação — ou um provedor que retirara a permissão — ainda abre o seletor, e segurar o
+botão faz o que o toque fazia antes, escolher o arquivo. Uma recusa apaga a memória do caminho, para
+o toque seguinte não bater na mesma porta.
 O app roda no telefone com o layout novo; o salvamento, a leitura via SAF e a lista de recentes
 ainda não foram conferidos um por um no aparelho.
 

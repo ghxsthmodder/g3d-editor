@@ -62,6 +62,8 @@
     <string name="discard_no">Cancelar</string>
     <string name="project_open">Abrir</string>
     <string name="project_save">Salvar</string>
+    <string name="project_save_tip">Toca: salva no arquivo do projeto. Segura: escolhe outro.</string>
+    <string name="project_saved_in_place">salvo no arquivo do projeto — segure Salvar para escolher outro</string>
     <string name="project_recent">Recentes</string>
     <string name="status_project_saving">gravando o projeto …</string>
     <string name="status_project_opening">abrindo o projeto %1$s …</string>

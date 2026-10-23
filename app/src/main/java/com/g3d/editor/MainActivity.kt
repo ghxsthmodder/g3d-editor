@@ -67,6 +67,12 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     @Volatile
     private var revision = 0
 
+    // The project file the document was last written to, and the files this run may write because
+    // the picker just handed them over. Saving goes back into the first when the provider still
+    // allows it, which is what turns the warning above into one tap.
+    private var projectFile: Uri? = null
+    private val sessionWritable = mutableSetOf<String>()
+
     // The name the model came in with, kept as the base name exports go out under, and the format
     // whose button opened the folder picker.
     private var modelName = "modelo"
@@ -89,6 +95,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var importButton: MaterialButton
     private lateinit var recentButton: MaterialButton
     private lateinit var projectState: TextView
+    private lateinit var saveButton: MaterialButton
     private lateinit var frameButton: MaterialButton
     private lateinit var logButton: MaterialButton
     private lateinit var shadingGroup: MaterialButtonToggleGroup
@@ -152,8 +159,14 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     // needs: nothing inside it references another file by name.
     private val saveProjectTo =
         registerForActivityResult(ActivityResultContracts.CreateDocument(MIME_MODEL_FILE)) { uri: Uri? ->
-            if (uri != null) writeProject(uri)
-            else report(getString(R.string.status_project_save_cancelled))
+            if (uri != null) {
+                // CreateDocument hands read and write for the file it just named, which is what
+                // lets the next tap on Salvar go back into it without another folder trip.
+                sessionWritable.add(uri.toString())
+                writeProject(uri)
+            } else {
+                report(getString(R.string.status_project_save_cancelled))
+            }
         }
 
     private val openProjectFrom =
@@ -237,7 +250,16 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         findViewById<View>(R.id.exportObj).setOnClickListener { startModelExport(FORMAT_OBJ) }
         findViewById<View>(R.id.exportGltf).setOnClickListener { startModelExport(FORMAT_GLTF) }
         findViewById<View>(R.id.exportGlb).setOnClickListener { startModelExport(FORMAT_GLB) }
-        findViewById<View>(R.id.projectSave).setOnClickListener { startProjectSave() }
+        saveButton = findViewById(R.id.projectSave)
+        saveButton.setOnClickListener { startProjectSave() }
+        // One button, two destinations: the tap writes where the document already lives and the
+        // long press is for moving it, because a "Salvar como" of its own would cost the panel a
+        // row and the recents list already says which file that is.
+        saveButton.setOnLongClickListener {
+            startProjectSaveAs()
+            true
+        }
+        saveButton.tooltipText = getString(R.string.project_save_tip)
         findViewById<View>(R.id.projectOpen).setOnClickListener { pickProject() }
         findViewById<View>(R.id.projectRecent).setOnClickListener { showRecentFiles() }
         // Dead entries are dropped before the first frame, so the button is only offered when every
@@ -1253,20 +1275,56 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     }
 
     private fun startProjectSave() {
-        if (busy || !Native.isAvailable) return
+        if (!projectSaveAllowed()) return
+        // The file the document was written to before is the one a tap on Salvar means; the picker
+        // is for the first save and for whoever holds the button down.
+        val known = projectFile
+        if (known != null && canWrite(known)) {
+            writeProject(known)
+        } else {
+            saveProjectTo.launch(suggestedProjectName())
+        }
+    }
+
+    /** The long press on the same button: the edits stay and the file they live in moves. */
+    private fun startProjectSaveAs() {
+        if (!projectSaveAllowed()) return
+        saveProjectTo.launch(suggestedProjectName())
+    }
+
+    /** @return whether there is a document to write, saying so where there is none. */
+    private fun projectSaveAllowed(): Boolean {
+        if (busy || !Native.isAvailable) return false
         if (rows.isEmpty()) {
             report(getString(R.string.status_project_empty))
-            return
+            return false
         }
-        saveProjectTo.launch(exportBaseName() + PROJECT_EXTENSION)
+        return true
     }
+
+    private fun suggestedProjectName(): String = exportBaseName() + PROJECT_EXTENSION
+
+    /**
+     * Whether bytes may go to that path again. What OpenDocument hands over is read-only, what
+     * CreateDocument names is writable for this run, and a durable grant is the only thing that
+     * keeps a file writable across a restart — so a project opened, not saved, normally needs the
+     * picker once before Salvar can act alone.
+     */
+    private fun canWrite(uri: Uri): Boolean =
+        sessionWritable.contains(uri.toString()) ||
+            contentResolver.persistedUriPermissions.any {
+                it.uri == uri && it.isWritePermission
+            }
 
     private fun writeProject(uri: Uri) {
         if (busy) return
+        // Written into the file the document already lives in, or into one the picker just named.
+        val direct = uri == projectFile
         beginWork(getString(R.string.status_project_saving))
         Thread {
             val startedAt = System.currentTimeMillis()
             var saved = false
+            var refused = false
             var written = -1
             val message = try {
                 noteStage("salvando o projeto")
@@ -1281,17 +1339,20 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     // lands during it would move the count with the file written without it.
                     written = revision
                     val stream = contentResolver.openOutputStream(uri)
-                        ?: throw IllegalStateException(
-                            getString(R.string.status_read_error, "fluxo indisponível"))
+                        ?: throw SecurityException("o provedor recusou o arquivo para escrita")
                     stream.use { it.write(bytes) }
                     saved = true
                     getString(
                         R.string.status_project_saved,
                         uri.lastPathSegment ?: ("projeto" + PROJECT_EXTENSION),
                         "${bytes.size / 1024} KB em ${System.currentTimeMillis() - startedAt} ms"
-                    ) + "\n" + Native.nativeProjectReport()
+                    ) + (if (direct) "\n" + getString(R.string.project_saved_in_place) else "") +
+                        "\n" + Native.nativeProjectReport()
                 }
             } catch (error: Throwable) {
+                // A refusal is the provider taking the write back; anything else is the disk, and
+                // the file the document lives in stays the file Salvar aims at.
+                refused = error is SecurityException || error is UnsupportedOperationException
                 getString(R.string.status_project_save_failed, error.message ?: "?")
             }
             runOnUiThread {
@@ -1300,7 +1361,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                 // The label comes down only if the document is still the one those bytes carried.
                 if (saved) {
                     recordRecent(uri, displayName(uri), project = true, writable = true)
+                    projectFile = uri
                     if (revision == written) clearDirty()
+                } else if (refused && direct) {
+                    projectFile = null
                 }
                 finishWork(message)
             }
@@ -1358,6 +1422,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     refreshTextureStack()
                     syncTextureCanvasField()
                     recordRecent(uri, name, project = true, writable = false)
+                    // Opening a project reads it: Salvar goes back into this same file only where a
+                    // write grant survived, which is the case for a project this app wrote itself.
+                    projectFile = if (canWrite(uri)) uri else null
                     // The document is the file now, edits and all: what it holds is written down.
                     clearDirty()
                 }
@@ -1615,6 +1682,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     viewport.frameScene()
                     refreshHierarchy()
                     recordRecent(uri, name, project = false, writable = false)
+                    // A model file is not a project: what the scene holds is what that file holds,
+                    // and the first Salvar has to be told where the project goes.
+                    projectFile = null
                     // What the scene holds is what that file holds: an import carries no edit over,
                     // so there is nothing left that only this run knows about.
                     clearDirty()

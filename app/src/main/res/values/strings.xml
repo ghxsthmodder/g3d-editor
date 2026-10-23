@@ -54,6 +54,12 @@
     <string name="status_model_export_warnings">o %1$s não guarda: %2$s</string>
 
     <string name="project_title">Projeto editável</string>
+    <string name="project_state_dirty">Projeto • não salvo</string>
+    <string name="project_state_dirty_tip">Há edições nos UVs ou nas camadas que ainda não entraram em um arquivo .g3dp.</string>
+    <string name="discard_title">Alterações não salvas</string>
+    <string name="discard_message">Abrir outro arquivo joga fora o que ainda não foi salvo em um projeto. O modelo importado volta quando o arquivo dele for aberto de novo; as edições de UV e de camadas não.</string>
+    <string name="discard_yes">Descartar e abrir</string>
+    <string name="discard_no">Cancelar</string>
     <string name="project_open">Abrir</string>
     <string name="project_save">Salvar</string>
     <string name="project_recent">Recentes</string>

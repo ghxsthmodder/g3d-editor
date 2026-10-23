@@ -439,8 +439,13 @@
                      with. The third opens nothing itself: it hands the choice to a dialog of files
                      still reachable, so the whole feature costs one row of the panel. The two short
                      labels take their own width and the long one what is left, because three equal
-                     columns in 204dp would clip "Recentes". -->
+                     columns in 204dp would clip "Recentes".
+                     The label doubles as the state of the document: an edit that never reached a
+                     file is the fact the row below is about, and a line of its own would cost the
+                     panel height to say four words. Every edit is made inside this panel, so the
+                     warning is on screen at the moment it becomes true. -->
                 <TextView
+                    android:id="@+id/projectState"
                     style="@style/Widget.G3D.SectionLabel"
                     android:paddingTop="6dp"
                     android:text="@string/project_title" />

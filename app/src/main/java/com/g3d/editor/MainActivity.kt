@@ -58,6 +58,15 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private var logVisible = false
     private var selectedLayer = -1
 
+    // True while the document holds something no file does: an applied UV layout, a layer stack.
+    // Only writing a project, or reading one back, takes it away. The count behind it is what makes
+    // the write honest: a project file holds the document as it was when the bytes were taken, and
+    // an edit that lands while the file is being written is not in it.
+    private var dirty = false
+
+    @Volatile
+    private var revision = 0
+
     // The name the model came in with, kept as the base name exports go out under, and the format
     // whose button opened the folder picker.
     private var modelName = "modelo"
@@ -79,6 +88,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private lateinit var workCancel: MaterialButton
     private lateinit var importButton: MaterialButton
     private lateinit var recentButton: MaterialButton
+    private lateinit var projectState: TextView
     private lateinit var frameButton: MaterialButton
     private lateinit var logButton: MaterialButton
     private lateinit var shadingGroup: MaterialButtonToggleGroup
@@ -179,6 +189,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         workCancel = findViewById(R.id.workCancel)
         importButton = findViewById(R.id.importModel)
         recentButton = findViewById(R.id.projectRecent)
+        projectState = findViewById(R.id.projectState)
         frameButton = findViewById(R.id.frameScene)
         logButton = findViewById(R.id.toggleLog)
         shadingGroup = findViewById(R.id.shadingGroup)
@@ -206,7 +217,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         textureLinesCheck = findViewById(R.id.textureUvLines)
 
         viewport.listener = this
-        importButton.setOnClickListener { openModel.launch(arrayOf("*/*")) }
+        importButton.setOnClickListener { guardDiscard { openModel.launch(arrayOf("*/*")) } }
         // The visible way out of a run, next to the number it reports. A tap that finds no
         // generation says so instead of pretending it stopped something.
         workCancel.setOnClickListener {
@@ -712,6 +723,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                 val mesh = uvMesh
                 closeUvEditor()
                 viewport.refreshScene()
+                // The layout is the mesh's now, and no file has it until a project is written.
+                markDirty()
                 finishWork(getString(R.string.status_uv_applied, mesh))
                 refreshHierarchy()
             }
@@ -857,6 +870,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     }
 
     private fun applyTextureCanvas(): Boolean {
+        // The stack is rewritten under the canvas while a file is being read or written, so a tap
+        // here would land in the middle of whatever the worker thread is holding.
+        if (busy) return false
         val side = integerField(textureCanvasField, 0)
         if (side < MIN_TEXTURE_SIDE || side > MAX_TEXTURE_SIDE) {
             report(getString(R.string.status_texture_bad_canvas))
@@ -867,6 +883,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             report(getString(R.string.status_texture_canvas_failed, reply.removePrefix("ERROR:").trim()))
             return false
         }
+        markDirty()
         report(getString(R.string.status_texture_canvas, side, side))
         refreshTextureStack()
         viewport.requestRender()
@@ -874,7 +891,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     }
 
     private fun applyTextureBackground() {
-        if (!Native.isAvailable) return
+        if (busy || !Native.isAvailable) return
         val hex = textureBackgroundField.text.toString().trim().removePrefix("#")
         val rgb = hex.toLongOrNull(16)
         if (hex.length != 6 || rgb == null) {
@@ -882,6 +899,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             return
         }
         Native.nativeTextureSetBackground(rgb.toInt())
+        markDirty()
         report(getString(R.string.status_texture_background, hex.uppercase(Locale.US)))
         refreshTextureStack()
         viewport.requestRender()
@@ -925,6 +943,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             runOnUiThread {
                 if (added >= 0) {
                     selectedLayer = added
+                    markDirty()
                 }
                 finishWork(message)
                 refreshTextureStack()
@@ -942,6 +961,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         if (reply.startsWith("ERROR:")) {
             report(getString(R.string.status_texture_failed, reply.removePrefix("ERROR:").trim()))
         } else {
+            markDirty()
             reply.lineSequence()
                 .firstOrNull { it.startsWith("camada=") }
                 ?.substringAfter('=')
@@ -969,9 +989,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             report(getString(R.string.status_texture_no_layer))
             return
         }
-        if (!action()) {
-            report(getString(R.string.status_texture_noop, name))
-        }
+        // A tool that moved something changed the stack the project file would have to carry.
+        if (action()) markDirty() else report(getString(R.string.status_texture_noop, name))
         refreshTextureStack()
         viewport.requestRender()
     }
@@ -1055,7 +1074,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         textureOpacityBar.progress = percent
         textureOpacityLabel.text = getString(R.string.texture_opacity) + " " + percent + "%"
         textureVisibleCheck.setOnCheckedChangeListener { _, checked ->
-            if (selectedLayer >= 0 && Native.nativeTextureSetVisible(selectedLayer, checked)) {
+            if (!busy && selectedLayer >= 0 &&
+                Native.nativeTextureSetVisible(selectedLayer, checked)) {
+                markDirty()
                 refreshTextureStack()
                 viewport.requestRender()
             }
@@ -1063,8 +1084,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         textureOpacityBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
                 textureOpacityLabel.text = getString(R.string.texture_opacity) + " " + value + "%"
-                if (fromUser && selectedLayer >= 0) {
-                    Native.nativeTextureSetOpacity(selectedLayer, value / 100.0f)
+                if (fromUser && !busy && selectedLayer >= 0 &&
+                    Native.nativeTextureSetOpacity(selectedLayer, value / 100.0f)) {
+                    markDirty()
                     refreshTextureStack()
                     viewport.requestRender()
                 }
@@ -1175,13 +1197,59 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     private fun exportBaseName(): String =
         modelName.replace(Regex("[^A-Za-z0-9 ._-]"), "_").ifBlank { "modelo" }
 
+    // --- estado do documento ---------------------------------------------------------------
+
+    /**
+     * Says that the document holds bytes no file holds yet. The label above the project row is the
+     * whole cost of it: every edit is made inside this panel, so the warning is on screen at the
+     * moment it becomes true, and a line of its own would spend height the tools are asking for.
+     */
+    private fun markDirty() {
+        revision++
+        if (dirty) return
+        dirty = true
+        projectState.setText(R.string.project_state_dirty)
+        projectState.tooltipText = getString(R.string.project_state_dirty_tip)
+        projectState.setTextColor(getColor(R.color.selection_accent))
+    }
+
+    /** A document that is what a file already holds cannot be lost, so there is nothing to warn. */
+    private fun clearDirty() {
+        if (!dirty) return
+        dirty = false
+        projectState.setText(R.string.project_title)
+        projectState.tooltipText = null
+        projectState.setTextColor(getColor(R.color.editor_text_dim))
+    }
+
+    /**
+     * Replacing the scene throws away what was never written down, and the picker is the last tap
+     * that can still bring the old document back: once the folder has been walked the choice is
+     * half made. So the warning comes before it, at the cost of one dialog for whoever opens a
+     * picker they had no intention of using.
+     */
+    private fun guardDiscard(then: () -> Unit) {
+        if (!dirty) {
+            then()
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.discard_title)
+            .setMessage(R.string.discard_message)
+            .setNegativeButton(R.string.discard_no, null)
+            .setPositiveButton(R.string.discard_yes) { _, _ -> then() }
+            .show()
+    }
+
     // --- project file ----------------------------------------------------------------------
 
     private fun pickProject() {
         if (busy || !Native.isAvailable) return
-        // Any file the picker offers: what decides whether it is a project is the G3DP header, and a
-        // provider that labels the file differently must not hide one that is perfectly good.
-        openProjectFrom.launch(arrayOf("*/*"))
+        guardDiscard {
+            // Any file the picker offers: what decides whether it is a project is the G3DP header,
+            // and a provider that labels the file differently must not hide one that is good.
+            openProjectFrom.launch(arrayOf("*/*"))
+        }
     }
 
     private fun startProjectSave() {
@@ -1199,6 +1267,7 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         Thread {
             val startedAt = System.currentTimeMillis()
             var saved = false
+            var written = -1
             val message = try {
                 noteStage("salvando o projeto")
                 val bytes = Native.nativeProjectBytes()
@@ -1207,6 +1276,10 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     // a fact about the document, not an I/O failure.
                     getString(R.string.status_project_save_failed, Native.nativeProjectReport())
                 } else {
+                    // Read after the bytes, because those bytes are the document up to this point
+                    // and nothing else is. An edit that landed before it is in the file; one that
+                    // lands during it would move the count with the file written without it.
+                    written = revision
                     val stream = contentResolver.openOutputStream(uri)
                         ?: throw IllegalStateException(
                             getString(R.string.status_read_error, "fluxo indisponível"))
@@ -1224,7 +1297,11 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             runOnUiThread {
                 // A project that was written is a project that can be reopened, and it is the file
                 // the editor now points at: the recents list would be behind the truth without it.
-                if (saved) recordRecent(uri, displayName(uri), project = true, writable = true)
+                // The label comes down only if the document is still the one those bytes carried.
+                if (saved) {
+                    recordRecent(uri, displayName(uri), project = true, writable = true)
+                    if (revision == written) clearDirty()
+                }
                 finishWork(message)
             }
         }.start()
@@ -1281,6 +1358,8 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     refreshTextureStack()
                     syncTextureCanvasField()
                     recordRecent(uri, name, project = true, writable = false)
+                    // The document is the file now, edits and all: what it holds is written down.
+                    clearDirty()
                 }
                 finishWork(message)
             }
@@ -1395,7 +1474,11 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
     /** Reopens a row of the list by the same path the picker used, so nothing about it is new. */
     private fun openRecent(entry: RecentEntry) {
         val uri = Uri.parse(entry.uri)
-        if (entry.project) readProject(uri) else importUri(uri)
+        // A row of the recents list replaces the scene just as a picker does, and it is one tap
+        // nearer to pressing by accident.
+        guardDiscard {
+            if (entry.project) readProject(uri) else importUri(uri)
+        }
     }
 
     /**
@@ -1532,6 +1615,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
                     viewport.frameScene()
                     refreshHierarchy()
                     recordRecent(uri, name, project = false, writable = false)
+                    // What the scene holds is what that file holds: an import carries no edit over,
+                    // so there is nothing left that only this run knows about.
+                    clearDirty()
                 }
                 finishWork(message)
             }

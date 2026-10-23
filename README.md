@@ -80,6 +80,15 @@ com a mensagem dizendo quantos saíram: prometer um arquivo que não abre é a m
 botão que não age. Os avisos de licença que a distribuição tem de levar também já estão no app: seis
 textos, cada um o arquivo que veio com a biblioteca, empacotados como *asset* e lidos de lá por um
 diálogo que abre no glifo do *rail* — a tela mostra o que o APK carrega porque é do APK que ela lê.
+O que ainda não virou arquivo também aparece: aplicar um layout de UV, redimensionar o canvas,
+mudar o fundo ou mexer em uma camada acende **Projeto • não salvo** sobre a fileira Abrir / Salvar /
+Recentes, e abrir outro arquivo com a luz acesa pede a confirmação antes de mostrar o seletor — a
+última tecla que ainda devolve o documento antigo é a que vem antes da pasta, não a que vem depois.
+A marca se apaga quando o `.g3dp` é gravado ou lido e quando um modelo entra limpo do arquivo dele;
+se algo mudar durante a gravação, ela fica acesa, porque aquele pedaço não entrou no arquivo. Os
+quatro controles do compositor que mexiam na pilha sem olhar se o editor estava ocupado — canvas,
+fundo, visível e opacidade — agora obedecem ao mesmo `busy` das outras ferramentas, e reescrever uma
+camada enquanto o projeto está sendo gravado deixou de ser possível.
 O app roda no telefone com o layout novo; o salvamento, a leitura via SAF e a lista de recentes
 ainda não foram conferidos um por um no aparelho.
 

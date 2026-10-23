@@ -36,7 +36,10 @@ gastaria 210 dp da altura e deixaria o atlas com 151 dp (aritmética de tela, ai
 aparelho) —, atlas dominante quando a edição é dele, a superfície dividida pelo seu lado curto —
 e no deitado o painel do atlas recebe no máximo a própria altura, que é o lado com que um quadrado
 cresce — a sobra voltando para o modelo em vez de virar tarja vazia ao lado das ilhas (a tarja media
-~9% da altura antes disto) — e arrastar com um dedo move as ilhas
+~9% da altura antes disto) — e o quadrado só pega a largura do modelo quando tem o que desenhar:
+no aparelho, abrir Camadas com a tela ainda não definida deixava o atlas com 1080 px dos 1462 da
+superfície para mostrar um quadrado vazio e o modelo com 379; a divisão agora só vira dominante com
+uma tela composta ou uma sessão de UV aberta — e arrastar com um dedo move as ilhas
 selecionadas. A seleção aceita pino: a ilha bloqueada continua destacada para poder ser destravada,
 mas nenhuma ferramenta a alcança, um arrasto cujo grupo inteiro está pinado é recusado e o dedo
 volta para a câmera, e o reempacotamento contorna a caixa que ela ocupa em vez de soterrá-la — o

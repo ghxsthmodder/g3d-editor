@@ -512,13 +512,26 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
         hierarchyPanel.visibility = if (tab == InspectorTab.Scene) View.VISIBLE else View.GONE
         uvPanel.visibility = if (tab == InspectorTab.Uv) View.VISIBLE else View.GONE
         texturePanel.visibility = if (tab == InspectorTab.Layers) View.VISIBLE else View.GONE
-        viewport.setSplitRatio(if (tab == InspectorTab.Scene) SPLIT_MODEL else SPLIT_ATLAS)
+        applyAtlasSplit()
         applyDeviceLimit()
         refreshMemoryLine()
         if (tab == InspectorTab.Layers) {
             showAtlasForTextures()
             refreshTextureStack()
         }
+    }
+
+    /**
+     * The atlas is given the wide side of the canvas only while it has something to draw there.
+     * Measured on the phone: opening Camadas over a compositor that had no canvas handed the atlas
+     * 1080 px of the 1462 the viewport had — an empty square — and left the model 379 px to work
+     * in. The UV session always carries islands, so that tab keeps the arrangement it had.
+     */
+    private fun applyAtlasSplit() {
+        val checked = inspectorTabs.checkedButtonId
+        val worthTheWidth = checked == R.id.tabUv ||
+            (checked == R.id.tabLayers && Native.nativeTextureHasCanvas())
+        viewport.setSplitRatio(if (worthTheWidth) SPLIT_ATLAS else SPLIT_MODEL)
     }
 
     /**
@@ -906,6 +919,9 @@ class MainActivity : AppCompatActivity(), ModelView.Listener {
             return false
         }
         markDirty()
+        // The canvas is what makes the square worth looking at: from here the atlas takes the wide
+        // side of the canvas again.
+        applyAtlasSplit()
         report(getString(R.string.status_texture_canvas, side, side))
         refreshTextureStack()
         viewport.requestRender()

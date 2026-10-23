@@ -398,7 +398,8 @@ int main() {
     // The app is locked to landscape, but the surface is whatever the window hands over: a tablet
     // held up or a split-screen window comes out taller than wide, and two panels side by side
     // there would each be measured by half of the short side. Stacked, both keep every pixel
-    // across. The bound below is 80% of the width because the atlas keeps a margin of its own.
+    // across. The bound below is 92% of the width because the square keeps a margin of its own, and
+    // that margin is the border's, not a tax on the panel.
     renderer.onSurfaceChanged(360, 640);
     renderer.setSplitRatio(g3d::kAtlasDominantSplitRatio);
     int atlasFirst = -1;
@@ -414,7 +415,7 @@ int main() {
         atlasLast = x;
     }
     const int atlasSpan = atlasLast - atlasFirst + 1;
-    check(atlasSpan * 100 >= 360 * 80,
+    check(atlasSpan * 100 >= 360 * 92,
           "em pe o atlas e medido pela largura quase toda, alcance=" + std::to_string(atlasSpan));
     check(atlasFirst > 0 && atlasFirst + atlasLast == 359,
           "o quadrado do atlas fica centrado na tela, primeiro=" + std::to_string(atlasFirst) +
@@ -443,11 +444,11 @@ int main() {
         wideLast = x;
     }
     const int wideSpan = wideLast - wideFirst + 1;
-    check(wideSpan * 100 >= 360 * 88 && wideSpan <= 360,
+    check(wideSpan * 100 >= 360 * 95 && wideSpan <= 360,
           "em deitado o quadrado do atlas e medido pela altura, alcance=" +
               std::to_string(wideSpan));
     const int atlasMargin = 639 - wideLast;
-    check(atlasMargin * 100 <= 360 * 12,
+    check(atlasMargin * 100 <= 360 * 5,
           "a direita do quadrado e a margem do painel e nao letterbox, folga=" +
               std::to_string(atlasMargin));
     check(wideFirst - atlasMargin >= 200,

@@ -39,8 +39,10 @@ constexpr const char *kTag = "G3DRender";
 #endif
 constexpr float kFovDegrees = 45.0f;
 constexpr float kPi = 3.14159265358979323846f;
-// The atlas square keeps a little margin so its border is never glued to the edge of the panel.
-constexpr float kAtlasMarginRatio = 0.92f;
+// The atlas square keeps a little margin so its border is never glued to the edge of the panel. The
+// margin is what the border needs, not what the panel can spare: at 0,92 the band around the square
+// was 17 dp per side on the phone, and a square does not grow sideways by asking politely.
+constexpr float kAtlasMarginRatio = 0.96f;
 // Two triangles drawn before everything else, so the grid and the islands have something to sit on.
 constexpr uint32_t kAtlasBackgroundVertices = 6;
 constexpr int kCheckerSide = 512;

@@ -10,7 +10,7 @@ as asserções vivas — a configuração em que o APK de depuração era compil
 importador glTF do Assimp faz antes de ler cai numa asserção do RapidJSON vendorizado, e uma
 asserção que falha chama `abort()` — no telefone, o editor fechando sem dizer nada. A metade
 nativa do APK de depuração passou a ser compilada como a do APK de distribuição; os limites abaixo
-seguem valendo, porque são outra coisa. Falta conferir no aparelho se a glb abre até o fim.
+seguem valendo, porque são outra coisa. Conferido no aparelho: o app roda e abre a glb de teste.
 A geração e a edição de UVs com xatlas (Fases 2 e 3) e o compositor de
 texturas (Fase 4) — importação de PNG/JPEG, pilha de camadas com posição, rotação, escala, opacidade
 e visibilidade, cor de fundo, prévia da composição no modelo e no atlas, modo quadriculado de
@@ -31,7 +31,7 @@ de glifos Material vendorizados no lugar das duas barras de texto, inspetor com 
 Camadas **feito coluna à direita, fechada por padrão** — a tela deste app é travada em paisagem
 (2400 × 1080 px, ~960 × 432 dp), então o lado escasso do telefone é a altura e o atlas é um quadrado
 medido pelo menor dos dois: a coluna gasta 216 dp de largura, o lado que sobra, e o quadrado do
-atlas mede ~372 dp de lado com as ferramentas abertas ou fechadas; uma gaveta na beirada de baixo
+atlas mede ~388 dp de lado com as ferramentas abertas ou fechadas; uma gaveta na beirada de baixo
 gastaria 210 dp da altura e deixaria o atlas com 151 dp (aritmética de tela, ainda não conferida no
 aparelho) —, atlas dominante quando a edição é dele, a superfície dividida pelo seu lado curto —
 e no deitado o painel do atlas recebe no máximo a própria altura, que é o lado com que um quadrado
@@ -72,8 +72,8 @@ com a mensagem dizendo quantos saíram: prometer um arquivo que não abre é a m
 botão que não age. Os avisos de licença que a distribuição tem de levar também já estão no app: seis
 textos, cada um o arquivo que veio com a biblioteca, empacotados como *asset* e lidos de lá por um
 diálogo que abre no glifo do *rail* — a tela mostra o que o APK carrega porque é do APK que ela lê.
-O layout novo, o salvamento, a leitura via SAF e a lista de recentes ainda não foram validados em
-telefone.
+O app roda no telefone com o layout novo; o salvamento, a leitura via SAF e a lista de recentes
+ainda não foram conferidos um por um no aparelho.
 
 ## Compilar
 
